@@ -3,13 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "_optimization_todo": "Bundle size >500KB - Consider: 1) Dynamic imports for code splitting, 2) Manual chunks in vite.config.ts, 3) Increase chunkSizeWarningLimit. See: https://rollupjs.org/configuration-options/#output-manualchunks",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:push": "node ./tools/run_migrations.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -76,14 +76,29 @@
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^16.1.4",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "pg": "^8.10.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
-  }
+  },
+  "description": "**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EduOsc-svg/remix-of-koleksi-lancar-ver-2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EduOsc-svg/remix-of-koleksi-lancar-ver-2/issues"
+  },
+  "homepage": "https://github.com/EduOsc-svg/remix-of-koleksi-lancar-ver-2#readme"
 }

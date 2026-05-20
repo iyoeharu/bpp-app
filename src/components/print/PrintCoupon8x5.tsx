@@ -1,4 +1,5 @@
 import React from 'react';
+import BG_IMAGE from '../../assets/Desain_tanpa_judul__2_-removebg.png';
 import { createPortal } from "react-dom";
 
 // --- Tipe Data ---
@@ -302,22 +303,55 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
   // Constants
   const REKENING_NUMBER = "7052-0101-4075-532";
   const KANTOR_NUMBER = "0852 5882 5882";
-  const BG_IMAGE_URL = "https://uploads.onecompiler.io/3zcmc9fyy/448fk8uyf/Desain_tanpa_judul__2_-removebg.png";
+  const BG_IMAGE_URL = BG_IMAGE;
   
-  // State untuk handle image loading
-  const [imageLoaded, setImageLoaded] = React.useState(false);
+  // Preload background once and reuse as a data URL to avoid repeated network fetches
+  const [bgDataUrl, setBgDataUrl] = React.useState<string | null>(null);
   const [imageError, setImageError] = React.useState(false);
 
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoaded(false);
-    setImageError(true);
-    console.warn('Background image failed to load:', BG_IMAGE_URL);
-  };
+  React.useEffect(() => {
+    let cancelled = false;
+    const img = new Image();
+    // Try to load with anonymous CORS so we can draw to canvas
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 1;
+        canvas.height = img.naturalHeight || img.height || 1;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/png');
+          setBgDataUrl(dataUrl);
+        } else {
+          // fallback to original URL if canvas unavailable
+          setBgDataUrl(BG_IMAGE_URL);
+        }
+        setImageError(false);
+      } catch (err) {
+        // On any error, fallback to using the original imported URL
+        setBgDataUrl(BG_IMAGE_URL);
+        setImageError(false);
+        // eslint-disable-next-line no-console
+        console.warn('Failed to convert bg image to data URL, using original URL', err);
+      }
+    };
+    img.onerror = () => {
+      if (cancelled) return;
+      setBgDataUrl(null);
+      setImageError(true);
+      // eslint-disable-next-line no-console
+      console.warn('Background image failed to load:', BG_IMAGE_URL);
+    };
+    img.src = BG_IMAGE_URL;
+    return () => {
+      cancelled = true;
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [BG_IMAGE_URL]);
 
   const printContent = (
     <>
@@ -425,21 +459,11 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
               
               return (
                 <div key={coupon.id} className={`coupon-card ${isUrgent ? 'coupon-urgent' : ''}`}>
-                  
-                  {/* Layer 1: Background Image (Pakai IMG agar dipaksa cetak) */}
-                  <img 
-                    src={BG_IMAGE_URL} 
-                    className="bg-img-layer" 
-                    alt="background"
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                    style={{
-                      display: imageError ? 'none' : 'block'
-                    }}
-                  />
-                  
-                  {/* Fallback background jika gambar gagal load */}
-                  {imageError && (
+
+                  {/* Layer 1: Background - use preloaded data URL if available, otherwise CSS fallback */}
+                  {bgDataUrl ? (
+                    <img src={bgDataUrl} className="bg-img-layer" alt="background" />
+                  ) : (
                     <div 
                       className="bg-img-layer"
                       style={{
@@ -486,10 +510,11 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
                         </div>
             {/* Angsuran Ke row removed - included in No, Kupon field as installment/tenor/sales/collector */}
             <div className="data-row" >
-              <span style={{ fontWeight: 'bold' }} className="label">Rekening BRI({REKENING_NUMBER})</span>
+              <span className="label">Rekening BRI</span>
+              <span className="value red-text" >({REKENING_NUMBER})</span>
             </div>
             <div className="data-row">
-              <span className="label">A.N CV MAHKOTA JAYA</span>
+              <span className="label">A.N MUHAMMAD ZAYADI</span>
             </div>
 
                     </div>
