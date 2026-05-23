@@ -178,11 +178,14 @@ export default function Dashboard() {
   }, [monthlyData?.total_modal, monthlyData?.total_omset]);
 
   // ===== YEARLY DERIVED VALUES =====
-  // Komisi tahunan = bonus tahunan 0.8% × total omset (BUKAN penjumlahan komisi bulanan)
-  const yearlyBonusCommission = useMemo(() => {
+  // Komisi tahunan (12 bulan): gunakan nilai authoritative dari yearlyFinancial jika tersedia
+  // Ini merepresentasikan total komisi selama 12 bulan untuk periode tahun terpilih.
+  const yearlyCommissionTotal = useMemo(() => {
+    const fromSummary = yearlyFinancial?.total_commission;
+    if (typeof fromSummary === 'number') return fromSummary;
     const omset = yearlyFinancial?.total_omset ?? 0;
     return (omset * YEARLY_BONUS_PERCENTAGE) / 100;
-  }, [yearlyFinancial?.total_omset]);
+  }, [yearlyFinancial?.total_commission, yearlyFinancial?.total_omset]);
 
   // Margin kotor tahunan: (omset - modal) / modal * 100
   const yearlyGrossProfitMargin = useMemo(() => {
@@ -192,12 +195,12 @@ export default function Dashboard() {
     return ((omset - modal) / modal) * 100;
   }, [yearlyFinancial?.total_modal, yearlyFinancial?.total_omset]);
 
-  // Keuntungan bersih tahunan: gross profit − komisi tahunan (0.8%) − biaya operasional
+  // Keuntungan bersih tahunan: gross profit − komisi 12B − biaya operasional
   const yearlyNetProfit = useMemo(() => {
     const profit = yearlyFinancial?.total_profit ?? 0;
     const expenses = yearlyFinancial?.total_expenses ?? 0;
-    return profit - yearlyBonusCommission - expenses;
-  }, [yearlyFinancial?.total_profit, yearlyFinancial?.total_expenses, yearlyBonusCommission]);
+    return profit - yearlyCommissionTotal - expenses;
+  }, [yearlyFinancial?.total_profit, yearlyFinancial?.total_expenses, yearlyCommissionTotal]);
 
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
@@ -727,11 +730,11 @@ export default function Dashboard() {
                 <StatCard
                   icon={Percent}
                   iconColor="text-purple-500"
-                  label="Total Komisi"
-                  value={yearlyBonusCommission}
+                  label="Komisi 12B"
+                  value={yearlyCommissionTotal}
                   valueColor="text-purple-600"
-                  subtitle={`Bonus tahunan ${YEARLY_BONUS_PERCENTAGE}% × Omset`}
-                  hoverInfo={`Komisi tahunan dihitung dari ${YEARLY_BONUS_PERCENTAGE}% × Total Omset tahun ${selectedYear.getFullYear()} (bukan akumulasi komisi bulanan).`}
+                  subtitle={`Total komisi 12 bulan (${selectedYear.getFullYear()})`}
+                  hoverInfo={`Total komisi yang dihitung untuk periode tahun ${selectedYear.getFullYear()} (12 bulan). Jika tersedia, ini berasal dari summary (authoritative).`}
                 />
 
                 <StatCard
