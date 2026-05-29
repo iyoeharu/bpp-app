@@ -244,6 +244,36 @@ export default function Auth() {
               <KeyRound className="mr-2 h-4 w-4" />
               Reset Password
             </Button>
+            {import.meta.env.DEV && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={async () => {
+                  // DEV-ONLY: Mock login to test dashboard
+                  try {
+                    // Create mock session data
+                    const mockSession = {
+                      user: { id: 'dev-user-123', email: 'dev@test.local' },
+                      access_token: 'dev-token',
+                      expires_at: Date.now() + 24 * 60 * 60 * 1000,
+                    };
+                    // Store in localStorage (Supabase auth-js format)
+                    localStorage.setItem(
+                      'sb-hgmtzunpaqoczwshfeer-auth-token',
+                      JSON.stringify(mockSession)
+                    );
+                    toast.success('Demo mode activated - redirecting to dashboard');
+                    // Force page reload to trigger auth check
+                    setTimeout(() => window.location.href = '/', 500);
+                  } catch (error) {
+                    toast.error('Demo mode failed');
+                  }
+                }}
+              >
+                🧪 Demo Mode (Dev Only)
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>

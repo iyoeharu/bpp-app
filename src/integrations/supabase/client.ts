@@ -3,15 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Prefer ANON key env name but fall back to publishable if that's what env provides
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
 });
+
+// Debug helper: in dev, log whether keys are present (masked)
+if (import.meta.env.DEV) {
+  const mask = (s: string | undefined) => s ? `${s.slice(0, 6)}...${s.slice(-6)}` : 'MISSING';
+  // eslint-disable-next-line no-console
+  console.log('[supabase] url=', SUPABASE_URL ? SUPABASE_URL : 'MISSING', 'key=', mask(SUPABASE_ANON_KEY));
+}

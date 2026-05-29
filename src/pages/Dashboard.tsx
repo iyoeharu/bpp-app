@@ -42,8 +42,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useTotalCommissionPaid } from "@/hooks/useCommissionPayments";
 import { format, startOfMonth, addMonths, subMonths } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -56,7 +54,6 @@ import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hoo
 import { useOmsetDetailsMonthly, useOmsetDetailsYearly } from "@/hooks/useOmsetDetails";
 import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from "@/hooks/useCollectorSalaries";
 import { useDpTotalMonthly, useDpTotalYearly } from "@/hooks/useDpTotal";
-import { YEARLY_BONUS_PERCENTAGE } from "@/hooks/useCommissionTiers";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -96,14 +93,9 @@ export default function Dashboard() {
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
   const { data: omsetMonthly } = useOmsetDetailsMonthly(selectedMonth);
   const { data: omsetYearly } = useOmsetDetailsYearly(selectedYear);
-  const [commissionSource, setCommissionSource] = useState<'12b' | '0.8' | 'paid'>('12b');
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
   const collectorSalaryTotalYearly = useCollectorSalaryTotalYearly(selectedYear);
-  // total commission paid (actual payments) for the selected year
-  const yearStartStr = format(startOfMonth(new Date(selectedYear.getFullYear(), 0, 1)), 'yyyy-MM-dd');
-  const yearEndStr = format(startOfMonth(new Date(selectedYear.getFullYear(), 11, 31)), 'yyyy-MM-dd');
-  const { data: totalCommissionPaid } = useTotalCommissionPaid(yearStartStr, yearEndStr as string);
   const { total: yearlyOpTotal, collectorSalaryTotal: yearlyOpCollectorSalaryTotal, operationalExclSalaries: yearlyOperationalExclSalaries } = useOperationalExpenseTotalsYearly(selectedYear);
   const { data: dpMonthly } = useDpTotalMonthly(selectedMonth);
   const { data: dpYearly } = useDpTotalYearly(selectedYear);
@@ -205,12 +197,6 @@ export default function Dashboard() {
     return 0;
   }, [yearlyFinancial?.monthly_breakdown, yearlyFinancial?.total_commission]);
 
-  // Komisi yang dihitung dari persentase (0.8% × total omset)
-  const yearlyBonusCommission = useMemo(() => {
-    const omset = yearlyFinancial?.total_omset ?? contractTotalsYearly.total_omset ?? 0;
-    return (omset * YEARLY_BONUS_PERCENTAGE) / 100;
-  }, [yearlyFinancial?.total_omset, contractTotalsYearly.total_omset]);
-
   // Margin kotor tahunan: (omset - modal) / modal * 100
   const yearlyGrossProfitMargin = useMemo(() => {
     const modal = yearlyFinancial?.total_modal ?? 0;
@@ -219,16 +205,14 @@ export default function Dashboard() {
     return ((omset - modal) / modal) * 100;
   }, [yearlyFinancial?.total_modal, yearlyFinancial?.total_omset]);
 
-  // Keuntungan bersih tahunan: gross profit − (pilihan komisi) − biaya operasional (ex. gaji) − gaji kolektor
+  // Keuntungan bersih tahunan: gross profit − komisi 12B − biaya operasional (ex. gaji) − gaji kolektor
   const yearlyNetProfit = useMemo(() => {
     const profit = yearlyFinancial?.total_profit ?? 0;
-    let commissionToUse = yearlyBonusCommission;
-    if (commissionSource === '12b') commissionToUse = yearlyCommissionTotal;
-    if (commissionSource === 'paid') commissionToUse = totalCommissionPaid ?? yearlyCommissionTotal;
+    const commission = yearlyCommissionTotal;
     const collector = yearlyOpCollectorSalaryTotal || collectorSalaryTotalYearly || 0;
     const opsExcl = yearlyOperationalExclSalaries || 0;
-    return profit - commissionToUse - opsExcl - collector;
-  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyBonusCommission, commissionSource, totalCommissionPaid, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOperationalExclSalaries]);
+    return profit - commission - opsExcl - collector;
+  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOperationalExclSalaries]);
 
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
@@ -670,13 +654,6 @@ export default function Dashboard() {
               <CardTitle>Kalkulasi Keuangan Tahunan</CardTitle>
             </div>
             <div className="flex items-center gap-2">
-              <div className="mr-4">
-                <ToggleGroup type="single" value={commissionSource} onValueChange={(v) => v && setCommissionSource(v as any)} className="bg-slate-100 p-1 rounded-lg">
-                  <ToggleGroupItem value="12b" className="text-xs px-3 py-1 data-[state=on]:bg-white data-[state=on]:shadow-sm rounded-md">Komisi 12B</ToggleGroupItem>
-                  <ToggleGroupItem value="0.8" className="text-xs px-3 py-1 data-[state=on]:bg-white data-[state=on]:shadow-sm rounded-md">Komisi 0.8%</ToggleGroupItem>
-                  <ToggleGroupItem value="paid" className="text-xs px-3 py-1 data-[state=on]:bg-white data-[state=on]:shadow-sm rounded-md">Komisi Dibayar</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
               <Select
                 value={selectedYear.getFullYear().toString()}
                 onValueChange={(val) => setSelectedYear(new Date(parseInt(val), 0, 1))}
@@ -766,20 +743,10 @@ export default function Dashboard() {
                   icon={Percent}
                   iconColor="text-purple-500"
                   label="Komisi 12B"
-                  value={commissionSource === 'paid' ? (totalCommissionPaid ?? yearlyCommissionTotal) : yearlyCommissionTotal}
+                  value={yearlyCommissionTotal}
                   valueColor="text-purple-600"
                   subtitle={`Total komisi 12 bulan (${selectedYear.getFullYear()})`}
-                  hoverInfo={`Total komisi yang dihitung untuk periode tahun ${selectedYear.getFullYear()} (12 bulan). Jika sumber komisi diset ke 'paid', menampilkan jumlah komisi yang sudah dibayarkan.`}
-                />
-
-                <StatCard
-                  icon={Percent}
-                  iconColor="text-violet-400"
-                  label="Komisi 0.8%"
-                  value={yearlyBonusCommission}
-                  valueColor="text-violet-600"
-                  subtitle={`0.8% × Omset ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Komisi yang dihitung sebagai ${YEARLY_BONUS_PERCENTAGE}% × Total Omset tahun ${selectedYear.getFullYear()} (formula).`}
+                  hoverInfo={`Total komisi dari seluruh bulan (Jan-Des) tahun ${selectedYear.getFullYear()} yang dihitung per agent berdasarkan omset & tier komisi masing-masing. Diambil langsung dari monthly breakdown real data.`}
                 />
 
                 <StatCard
@@ -861,7 +828,7 @@ export default function Dashboard() {
                         {formatRupiah(yearlyNetProfit)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Keuntungan Kotor − Komisi Tahunan ({YEARLY_BONUS_PERCENTAGE}%) − Biaya Operasional
+                        Keuntungan Kotor − Komisi 12B (sum real bulanan) − Biaya Operasional − Gaji Kolektor
                       </p>
                     </div>
                     <div className="text-right">
