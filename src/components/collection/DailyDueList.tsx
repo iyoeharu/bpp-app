@@ -160,19 +160,16 @@ export function DailyDueList({
   // Dialog state
   const [selected, setSelected] = useState<DueRow | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
-  const [noteText, setNoteText] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   // Default returnedCount = semua unpaid (manual modal = tandai "belum bayar")
   const openDialog = (row: DueRow) => {
     setSelected(row);
     setReturnedCount(row.unpaid_count);
-    setNoteText("");
   };
   const closeDialog = () => {
     setSelected(null);
     setReturnedCount(0);
-    setNoteText("");
   };
 
   // Core processor — dipakai oleh tombol "Bayar" (auto lunas) dan modal "Belum Bayar"
@@ -247,14 +244,10 @@ export function DailyDueList({
   // Submit dari modal "Belum Bayar" (manual)
   const handleSubmit = async () => {
     if (!selected) return;
-    if (!noteText.trim()) {
-      toast.error("Catatan wajib diisi untuk menandai kupon belum bayar");
-      return;
-    }
     const returned = Math.max(0, Math.min(returnedCount, selected.unpaid_count));
     setSubmitting(true);
     try {
-      await processRow(selected, returned, noteText.trim());
+      await processRow(selected, returned, "");
       closeDialog();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
@@ -456,22 +449,6 @@ export function DailyDueList({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="note-text" className="text-sm font-medium">
-                  Catatan <span className="text-destructive">*</span>
-                </Label>
-                <Textarea
-                  id="note-text"
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Alasan belum bayar (mis. pelanggan tidak di rumah, janji bayar besok, dll.)"
-                  rows={3}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Catatan wajib diisi dan akan disimpan di log aktivitas.
-                </p>
-              </div>
-
               <Alert
                 className={
                   returnedCount > 0
@@ -514,7 +491,7 @@ export function DailyDueList({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !noteText.trim()}
+              disabled={submitting}
               variant="destructive"
             >
               {submitting ? "Menyimpan..." : "Simpan"}
