@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, AlertTriangle, Wallet } from "lucide-react";
+import { CalendarClock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -162,7 +162,6 @@ export function DailyDueList({
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [noteText, setNoteText] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [autoPayingId, setAutoPayingId] = useState<string | null>(null);
 
   // Default returnedCount = semua unpaid (manual modal = tandai "belum bayar")
   const openDialog = (row: DueRow) => {
@@ -243,20 +242,6 @@ export function DailyDueList({
       toast.success(
         `${row.customer_name}: ${paidCount} lunas, ${safeReturned} kembali`,
       );
-  };
-
-  // Tombol "Bayar" pada row → auto LUNAS semua kupon outstanding
-  const handleAutoPay = async (row: DueRow) => {
-    if (row.unpaid_count <= 0) return;
-    setAutoPayingId(row.handover_id);
-    try {
-      await processRow(row, 0, "");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
-      toast.error(`Gagal mencatat pembayaran: ${msg}`);
-    } finally {
-      setAutoPayingId(null);
-    }
   };
 
   // Submit dari modal "Belum Bayar" (manual)
@@ -387,20 +372,6 @@ export function DailyDueList({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAutoPay(row)}
-                            disabled={
-                              row.unpaid_count <= 0 ||
-                              autoPayingId === row.handover_id
-                            }
-                            className="gap-1"
-                          >
-                            <Wallet className="h-3.5 w-3.5" />
-                            {autoPayingId === row.handover_id
-                              ? "Memproses..."
-                              : "Bayar"}
-                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
