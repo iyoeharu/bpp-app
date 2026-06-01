@@ -421,7 +421,7 @@ export function DailyProfitList() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Detail per Kontrak — {formatDate(selectedDate)}</CardTitle>
-              <CardDescription>Rincian kupon yang dibayar pada tanggal terpilih (scroll untuk melihat lebih banyak data)</CardDescription>
+              <CardDescription>Rincian kupon yang dibayar pada tanggal terpilih</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="rounded-md border w-full" style={{ maxHeight: "500px" }}>
@@ -454,7 +454,9 @@ export function DailyProfitList() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      dailyRows.map((r) => {
+                      dailyRows
+                        .slice((detailPage - 1) * DETAIL_PAGE_SIZE, detailPage * DETAIL_PAGE_SIZE)
+                        .map((r) => {
                         return (
                           <TableRow key={r.contract_id}>
                             <TableCell className="font-mono text-xs">{r.contract_ref}</TableCell>
@@ -484,6 +486,42 @@ export function DailyProfitList() {
                 </Table>
                 </div>
               </ScrollArea>
+              {dailyRows.length > 0 && (() => {
+                const totalPages = Math.max(1, Math.ceil(dailyRows.length / DETAIL_PAGE_SIZE));
+                const currentPage = Math.min(detailPage, totalPages);
+                const from = (currentPage - 1) * DETAIL_PAGE_SIZE + 1;
+                const to = Math.min(currentPage * DETAIL_PAGE_SIZE, dailyRows.length);
+                return (
+                  <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
+                    <div className="text-xs text-muted-foreground">
+                      Menampilkan {from}–{to} dari {dailyRows.length} kontrak
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Sebelumnya
+                      </Button>
+                      <div className="text-xs text-muted-foreground">
+                        Halaman {currentPage} / {totalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                      >
+                        Berikutnya
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
