@@ -369,12 +369,17 @@ export default function CustomerHistory() {
                   <div>
                     <p className="text-sm text-muted-foreground">Tgl Lunas</p>
                     <p className="font-medium">
-                      {selectedContract.status === 'completed' 
-                        ? (payments && payments.length > 0 
-                          ? formatDate(payments[0].payment_date) 
-                          : "-")
-                        : "-"
-                      }
+                      {(() => {
+                        const info = statusMap?.get(selectedContract.id);
+                        const isLunas = info?.status === 'completed' || selectedContract.status === 'completed';
+                        if (!isLunas) return "-";
+                        // Ambil tanggal pembayaran terakhir = max(payment_date)
+                        const latest = info?.completedDate
+                          ?? (payments && payments.length > 0
+                              ? payments.reduce((max, p) => (p.payment_date > max ? p.payment_date : max), payments[0].payment_date)
+                              : null);
+                        return latest ? formatDate(latest) : "-";
+                      })()}
                     </p>
                   </div>
                 </div>
