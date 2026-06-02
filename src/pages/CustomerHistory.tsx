@@ -24,6 +24,7 @@ import { useCustomers } from "@/hooks/useCustomers";
 import { useContracts } from "@/hooks/useContracts";
 import { usePaymentsByContract } from "@/hooks/usePayments";
 import { useCouponsByContract } from "@/hooks/useInstallmentCoupons";
+import { useContractStatusMap } from "@/hooks/useContractStatusMap";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
@@ -40,42 +41,22 @@ import {
 
 type ContractStatusFilter = 'all' | 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet' | 'completed';
 
-// Calculate dynamic contract status using heuristic (legacy) when coupon/payment data is not available
-const calculateContractStatusFallback = (contract: {
-  status: string;
-  current_installment_index: number;
-  created_at: string;
-}): ContractStatus => {
-  if (contract.status === 'completed') return 'completed';
-  
-  const daysSinceCreation = differenceInDays(new Date(), new Date(contract.created_at));
-  const installmentsPaid = contract.current_installment_index;
-  
-  // Jika belum ada pembayaran sama sekali
-  if (installmentsPaid === 0) {
-    if (daysSinceCreation <= 1) return 'sangat_lancar';
-    if (daysSinceCreation <= 3) return 'lancar';
-    if (daysSinceCreation <= 19) return 'kurang_lancar';
-    return 'macet';
-  }
-  
-  // Heuristik: rata-rata hari per cicilan
-  const daysPerDue = daysSinceCreation / installmentsPaid;
-  const estimatedLateDays = Math.max(0, (daysPerDue - 1) * 30); // Perkiraan kasar
-  
-  if (estimatedLateDays === 0) return 'sangat_lancar';
-  if (estimatedLateDays <= 3) return 'lancar';
-  if (estimatedLateDays <= 19) return 'kurang_lancar';
-  return 'macet';
-};
-
 export default function CustomerHistory() {
   const { data: customers } = useCustomers();
   const { data: contracts } = useContracts();
+  const { data: statusMap } = useContractStatusMap();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedContractId, setSelectedContractId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<ContractStatusFilter>('all');
+
+  // Helper: ambil status real-time, fallback ke heuristik bila map belum siap
+  const getStatus = (contract: { id: string; status: string; current_installment_index: number; created_at: string }): ContractStatus => {
+    const info = statusMap?.get(contract.id);
+    if (info) return info.status;
+    if (contract.status === 'completed') return 'completed';
+    return 'sangat_lancar';
+  };
 
   // Filter customers based on search term AND status filter
   const filteredCustomers = useMemo(() => {
@@ -98,11 +79,11 @@ export default function CustomerHistory() {
       // Check if customer has any contract matching the status filter
       const customerContracts = contracts.filter(c => c.customer_id === customer.id);
       return customerContracts.some(contract => {
-        const dynamicStatus = calculateContractStatusFallback(contract);
+        const dynamicStatus = getStatus(contract);
         return dynamicStatus === statusFilter;
       });
     });
-  }, [customers, contracts, searchTerm, statusFilter]);
+  }, [customers, contracts, searchTerm, statusFilter, statusMap]);
 
   // Filter contracts for selected customer based on status filter
   const customerContracts = useMemo(() => {
@@ -113,10 +94,10 @@ export default function CustomerHistory() {
     if (statusFilter === 'all') return filtered;
     
     return filtered.filter(contract => {
-      const dynamicStatus = calculateContractStatusFallback(contract);
+      const dynamicStatus = getStatus(contract);
       return dynamicStatus === statusFilter;
     });
-  }, [contracts, selectedCustomerId, statusFilter]);
+  }, [contracts, selectedCustomerId, statusFilter, statusMap]);
 
   const { data: payments, isLoading: loadingPayments } = usePaymentsByContract(
     selectedContractId
@@ -146,7 +127,7 @@ export default function CustomerHistory() {
 
   // Get dynamic status for selected contract
   const selectedContractDynamicStatus = selectedContract 
-    ? calculateContractStatusFallback(selectedContract) 
+    ? getStatus(selectedContract)
     : null;
 
   // Tanggal jatuh tempo = due_date kupon unpaid berikutnya
@@ -232,7 +213,7 @@ export default function CustomerHistory() {
                 // Get contracts for this customer to show status badges
                 const custContracts = contracts?.filter(c => c.customer_id === customer.id) || [];
                 const statusCounts = custContracts.reduce((acc, c) => {
-                  const status = calculateContractStatusFallback(c);
+                  const status = getStatus(c);
                   acc[status] = (acc[status] || 0) + 1;
                   return acc;
                 }, {} as Record<string, number>);
@@ -318,7 +299,7 @@ export default function CustomerHistory() {
                 </SelectTrigger>
                 <SelectContent>
                   {customerContracts?.map((contract) => {
-                    const contractStatus = calculateContractStatusFallback(contract);
+                    const contractStatus = getStatus(contract);
                     return (
                       <SelectItem key={contract.id} value={contract.id}>
                         <div className="flex items-center gap-2">
@@ -388,12 +369,17 @@ export default function CustomerHistory() {
                   <div>
                     <p className="text-sm text-muted-foreground">Tgl Lunas</p>
                     <p className="font-medium">
-                      {selectedContract.status === 'completed' 
-                        ? (payments && payments.length > 0 
-                          ? formatDate(payments[0].payment_date) 
-                          : "-")
-                        : "-"
-                      }
+                      {(() => {
+                        const info = statusMap?.get(selectedContract.id);
+                        const isLunas = info?.status === 'completed' || selectedContract.status === 'completed';
+                        if (!isLunas) return "-";
+                        // Ambil tanggal pembayaran terakhir = max(payment_date)
+                        const latest = info?.completedDate
+                          ?? (payments && payments.length > 0
+                              ? payments.reduce((max, p) => (p.payment_date > max ? p.payment_date : max), payments[0].payment_date)
+                              : null);
+                        return latest ? formatDate(latest) : "-";
+                      })()}
                     </p>
                   </div>
                 </div>

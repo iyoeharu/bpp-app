@@ -32,10 +32,12 @@ export const calculateDaysSinceLastPayment = (lastPaymentDate: string | null | u
 
 /**
  * Status Kontrak berdasarkan keterlambatan pembayaran
- * - sangat_lancar: Tidak ada keterlambatan sama sekali (0 hari terlambat)
- * - lancar: Terlambat 1-3 hari
- * - kurang_lancar: Terlambat 4-19 hari
- * - macet: Terlambat 20+ hari ATAU 6+ hari tanpa pembayaran
+ * Keterlambatan dihitung dari jumlah kupon (hari) yang belum dibayar
+ * sejak due_date kupon unpaid paling awal.
+ * - sangat_lancar: Bayar tepat di tanggal jatuh tempo (0 hari terlambat)
+ * - lancar       : Terlambat < 3 hari (1-3 kupon belum dibayar)
+ * - kurang_lancar: Terlambat > 3 sampai 20 hari (4-20 kupon)
+ * - macet        : Terlambat > 20 hari (lebih dari 20 kupon)
  */
 export type ContractStatus = 'completed' | 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet';
 
@@ -56,16 +58,12 @@ export const determineContractStatus = (input: ContractStatusInput): ContractSta
   if (input.status === 'completed') return 'completed';
   
   const lateDays = input.lateDays ?? 0;
-  const daysSinceLastPayment = input.daysSinceLastPayment ?? 0;
-  
-  // Rule 1: Jika 6+ hari tanpa pembayaran → macet (konsekutif = tidak boleh ada pembayaran)
-  if (daysSinceLastPayment >= 6) return 'macet';
-  
-  // Rule 2: Berdasarkan hari keterlambatan pembayaran
-  if (lateDays === 0) return 'sangat_lancar';
-  if (lateDays <= 3) return 'lancar';
-  if (lateDays <= 19) return 'kurang_lancar';
-  return 'macet'; // 20+ hari
+
+  // Klasifikasi berdasarkan hari keterlambatan kupon (1 kupon = 1 hari)
+  if (lateDays <= 0) return 'sangat_lancar';
+  if (lateDays <= 3) return 'lancar';        // 1-3 hari
+  if (lateDays <= 20) return 'kurang_lancar'; // 4-20 hari
+  return 'macet';                              // > 20 hari
 };
 
 /**
@@ -82,24 +80,10 @@ export const calculateContractStatusLegacy = (contract: {
   
   const daysSinceCreation = differenceInDays(new Date(), new Date(contract.created_at));
   const installmentsPaid = contract.current_installment_index;
-  
-  // Jika belum ada pembayaran sama sekali
-  if (installmentsPaid === 0) {
-    // Asumsi: kontrak baru belum harus membayar
-    if (daysSinceCreation <= 1) return 'sangat_lancar';
-    if (daysSinceCreation <= 3) return 'lancar';
-    if (daysSinceCreation <= 19) return 'kurang_lancar';
-    return 'macet';
-  }
-  
-  // Heuristik: rata-rata hari per cicilan
-  const daysPerDue = daysSinceCreation / installmentsPaid;
-  const estimatedLateDays = Math.max(0, daysPerDue - 1) * 30; // Perkiraan kasar
-  
-  if (estimatedLateDays === 0) return 'sangat_lancar';
-  if (estimatedLateDays <= 3) return 'lancar';
-  if (estimatedLateDays <= 19) return 'kurang_lancar';
-  return 'macet';
+
+  // Estimasi: lateDays = hari berlalu sejak start - kupon dibayar
+  const lateDays = Math.max(0, daysSinceCreation - installmentsPaid);
+  return determineContractStatus({ status: contract.status, lateDays });
 };
 
 /**

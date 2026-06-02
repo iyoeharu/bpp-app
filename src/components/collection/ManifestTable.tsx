@@ -14,6 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { OutstandingCouponSummary } from "@/hooks/useOutstandingCoupons";
+import { useContractStatusMap } from "@/hooks/useContractStatusMap";
+import { getStatusLabel, getStatusBadgeClass, ContractStatus } from "@/lib/statusCalculation";
 
 interface Contract {
   id: string;
@@ -27,29 +29,7 @@ interface Contract {
   customers: { name: string } | null;
 }
 
-type ManifestStatus = 'lancar' | 'kurang_lancar' | 'macet' | 'returned' | 'completed';
-
-function calcManifestStatus(c: Contract): ManifestStatus {
-  if (c.status === 'returned') return 'returned';
-  if (c.status === 'completed' || (c.tenor_days > 0 && c.current_installment_index >= c.tenor_days)) return 'completed';
-  const ref = c.start_date || c.created_at;
-  if (!ref) return 'lancar';
-  const days = Math.max(1, Math.floor((Date.now() - new Date(ref).getTime()) / 86400000));
-  const paid = c.current_installment_index;
-  if (paid === 0) return days > 7 ? 'macet' : days > 3 ? 'kurang_lancar' : 'lancar';
-  const ratio = days / paid;
-  if (ratio <= 1.2) return 'lancar';
-  if (ratio <= 2.0) return 'kurang_lancar';
-  return 'macet';
-}
-
-const STATUS_META: Record<ManifestStatus, { label: string; cls: string }> = {
-  lancar:        { label: 'Lancar',        cls: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300' },
-  kurang_lancar: { label: 'Kurang Lancar', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  macet:         { label: 'Macet',         cls: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300' },
-  returned:      { label: 'Return',        cls: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300' },
-  completed:     { label: 'Lunas',         cls: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300' },
-};
+const RETURNED_META = { label: 'Return', cls: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300' };
 
 interface ManifestTableProps {
   contracts: Contract[] | undefined;
@@ -76,6 +56,7 @@ export function ManifestTable({
   searchQuery,
   outstandingData,
 }: ManifestTableProps) {
+  const { data: statusMap } = useContractStatusMap();
   // Build outstanding lookup
   const outstandingMap = new Map<string, OutstandingCouponSummary>();
   if (outstandingData) {
@@ -215,13 +196,31 @@ export function ManifestTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {(() => {
-                      const st = calcManifestStatus(contract);
-                      const meta = STATUS_META[st];
+                      // Kontrak returned tetap ditandai khusus
+                      if (contract.status === 'returned') {
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="outline" className={cn("text-xs", RETURNED_META.cls)}>
+                              {RETURNED_META.label}
+                            </Badge>
+                          </div>
+                        );
+                      }
+                      const info = statusMap?.get(contract.id);
+                      const st: ContractStatus = info?.status
+                        ?? (contract.status === 'completed' ? 'completed' : 'sangat_lancar');
+                      const label = getStatusLabel(st);
+                      const cls = getStatusBadgeClass(st) + ' border';
                       return (
                         <div className="flex flex-col items-end gap-1">
-                          <Badge variant="outline" className={cn("text-xs", meta.cls)}>
-                            {meta.label}
+                          <Badge variant="outline" className={cn("text-xs", cls)}>
+                            {label}
                           </Badge>
+                          {info && info.lateDays > 0 && st !== 'completed' && (
+                            <span className="text-[10px] text-muted-foreground">
+                              Terlambat {info.lateDays} kupon
+                            </span>
+                          )}
                           {unpaidCoupons > 0 && (
                             <span className="text-[10px] text-muted-foreground">
                               {formatRupiah(unpaidAmount)} • {unpaidCoupons} kupon
