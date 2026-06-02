@@ -71,10 +71,8 @@ export const useContractStatusMap = () => {
       for (const c of unpaid) {
         const prev = unpaidByContract.get(c.contract_id) ?? { lateDays: 0, unpaidCount: 0 };
         prev.unpaidCount += 1;
-        if (c.due_date <= todayStr && c.due_date < todayStr) {
-          // strictly before today => overdue (today belum dianggap terlambat)
-          prev.lateDays += 1;
-        }
+        // Kupon overdue = due_date sudah lewat (sebelum hari ini)
+        if (c.due_date < todayStr) prev.lateDays += 1;
         unpaidByContract.set(c.contract_id, prev);
       }
 
