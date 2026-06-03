@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Check, ChevronsUpDown, Send, Users, FileText, Calendar, MessageSquare, DollarSign, Hash, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronsUpDown, Send, Users, FileText, Calendar, MessageSquare, DollarSign, Hash, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const startIndex = selectedContract ? selectedContract.current_installment_index + 1 : 1;
   const endIndex = startIndex + couponCount - 1;
   const maxCoupons = selectedContract ? selectedContract.tenor_days - selectedContract.current_installment_index : 0;
+  const submittedRef = useRef<string | null>(null);
 
   // Auto-fill collector from contract when contract is selected
   useEffect(() => {
@@ -72,8 +73,8 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
   }, [contractId, contracts]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!collectorId || !contractId || couponCount < 1) {
       toast.error("Lengkapi semua field yang wajib diisi");
       return;
@@ -96,6 +97,16 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     setCouponCount(1);
     setNotes("");
   };
+
+  // AUTO-SAVE: setelah kontrak dipilih (dan kolektor ter-resolve), simpan otomatis.
+  useEffect(() => {
+    if (!contractId || !collectorId || isSubmitting) return;
+    if (submittedRef.current === contractId) return;
+    if (!selectedContract || maxCoupons <= 0) return;
+    submittedRef.current = contractId;
+    void handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractId, collectorId, selectedContract?.id, maxCoupons, isSubmitting]);
 
   return (
     <Card className="shadow-sm border-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
