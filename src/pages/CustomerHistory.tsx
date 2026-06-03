@@ -523,11 +523,15 @@ export default function CustomerHistory() {
                       paginatedPayments?.map((payment) => (
                         <TableRow key={payment.id}>
                           <TableCell>
-                            <Badge variant="outline">{payment.installment_index}</Badge>
+                            <Badge variant="outline">
+                              {payment.start_index === payment.end_index
+                                ? payment.start_index
+                                : `${payment.start_index} - ${payment.end_index}`}
+                            </Badge>
                           </TableCell>
                           <TableCell>{formatDate(payment.payment_date)}</TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatRupiah(Number(payment.amount_paid))}
+                            {formatRupiah(payment.total_amount)}
                           </TableCell>
                           <TableCell>{payment.collectors?.name || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">
