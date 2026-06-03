@@ -64,19 +64,24 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     ? contracts?.filter(c => c.collector_id === collectorId)
     : contracts;
 
-  // Auto-fill collector from contract when contract is selected
+  // Auto-fill collector from contract when contract is selected (jika belum diisi)
   useEffect(() => {
-    if (!contractId) {
-      setCollectorId("");
-      return;
-    }
-    
-    // Use collector assigned to the contract directly
+    if (!contractId) return;
     const contract = contracts?.find(c => c.id === contractId);
-    if (contract?.collector_id) {
+    if (contract?.collector_id && !collectorId) {
       setCollectorId(contract.collector_id);
     }
-  }, [contractId, contracts]);
+  }, [contractId, contracts, collectorId]);
+
+  // Reset kontrak jika tidak lagi sesuai filter kolektor
+  useEffect(() => {
+    if (!collectorId || !contractId) return;
+    const c = contracts?.find(x => x.id === contractId);
+    if (c && c.collector_id !== collectorId) {
+      setContractId("");
+      submittedRef.current = null;
+    }
+  }, [collectorId, contractId, contracts]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
