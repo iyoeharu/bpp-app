@@ -156,7 +156,7 @@ export function PaymentForm({ contracts, collectors, onSubmit, onBulkSubmit, isS
     try {
   if (isBulkPayment) {
   // Bulk payment
-  const defaultNote = `Pembayaran kupon ${nextCoupon}-${endCoupon}`;
+  const defaultNote = `Kupon yang dibayar adalah ${nextCoupon} - ${endCoupon}`;
   const finalNotes = paymentNotes.trim() || defaultNote;
 
         await onBulkSubmit({
@@ -477,7 +477,7 @@ export function PaymentForm({ contracts, collectors, onSubmit, onBulkSubmit, isS
               lateInfo.isLate
                 ? t("collection.lateNotePlaceholder")
         : isBulkPayment 
-          ? `Default: Pembayaran kupon ${nextCoupon}-${endCoupon}`
+          ? `Default: Kupon yang dibayar adalah ${nextCoupon} - ${endCoupon}`
           : `Default: Pembayaran ke-${nextCoupon}`
             }
             rows={2}

@@ -166,7 +166,7 @@ export const useCreateBulkPayment = () => {
           installment_index: i,
           amount_paid: amount_per_coupon,
           collector_id,
-          notes: notes || `Pembayaran ke-${i}`,
+          notes: notes || `Kupon yang dibayar adalah ${start_index} - ${endIndex}`,
         });
       }
       

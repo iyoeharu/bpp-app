@@ -106,8 +106,62 @@ export default function CustomerHistory() {
   // Pagination constants
   const ITEMS_PER_PAGE = 5;
   
-  // Add pagination for payments
-  const { currentPage, totalPages, paginatedItems: paginatedPayments, goToPage, totalItems } = usePagination(payments, ITEMS_PER_PAGE);
+  // Group bulk payments (same payment_date + notes + collector, consecutive installments) into one row
+  const groupedPayments = useMemo(() => {
+    if (!payments) return [] as Array<{
+      id: string;
+      payment_date: string;
+      collectors: { name: string; collector_code: string } | null;
+      notes: string | null;
+      start_index: number;
+      end_index: number;
+      total_amount: number;
+      count: number;
+    }>;
+    const sorted = [...payments].sort((a, b) => {
+      if (a.payment_date !== b.payment_date) return a.payment_date < b.payment_date ? 1 : -1;
+      return a.installment_index - b.installment_index;
+    });
+    const groups: Array<{
+      id: string;
+      payment_date: string;
+      collectors: { name: string; collector_code: string } | null;
+      notes: string | null;
+      start_index: number;
+      end_index: number;
+      total_amount: number;
+      count: number;
+    }> = [];
+    for (const p of sorted) {
+      const last = groups[groups.length - 1];
+      const sameGroup =
+        last &&
+        last.payment_date === p.payment_date &&
+        (last.notes || '') === (p.notes || '') &&
+        (last.collectors?.name || '') === (p.collectors?.name || '') &&
+        p.installment_index === last.end_index + 1;
+      if (sameGroup) {
+        last.end_index = p.installment_index;
+        last.total_amount += Number(p.amount_paid);
+        last.count += 1;
+      } else {
+        groups.push({
+          id: p.id,
+          payment_date: p.payment_date,
+          collectors: p.collectors,
+          notes: p.notes,
+          start_index: p.installment_index,
+          end_index: p.installment_index,
+          total_amount: Number(p.amount_paid),
+          count: 1,
+        });
+      }
+    }
+    return groups;
+  }, [payments]);
+
+  // Add pagination for grouped payments
+  const { currentPage, totalPages, paginatedItems: paginatedPayments, goToPage, totalItems } = usePagination(groupedPayments, ITEMS_PER_PAGE);
 
   // Add pagination for customer list
   const { 
@@ -469,11 +523,15 @@ export default function CustomerHistory() {
                       paginatedPayments?.map((payment) => (
                         <TableRow key={payment.id}>
                           <TableCell>
-                            <Badge variant="outline">{payment.installment_index}</Badge>
+                            <Badge variant="outline">
+                              {payment.start_index === payment.end_index
+                                ? payment.start_index
+                                : `${payment.start_index} - ${payment.end_index}`}
+                            </Badge>
                           </TableCell>
                           <TableCell>{formatDate(payment.payment_date)}</TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatRupiah(Number(payment.amount_paid))}
+                            {formatRupiah(payment.total_amount)}
                           </TableCell>
                           <TableCell>{payment.collectors?.name || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">
