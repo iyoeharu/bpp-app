@@ -384,34 +384,21 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
             </div>
           </div>
 
-          {/* Enhanced Submit Section */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-            <div className="flex-1">
-              {selectedContract && couponCount > 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                  <span>Siap untuk diserahkan: <strong>{couponCount} kupon</strong> senilai <strong>{formatRupiah(couponCount * selectedContract.daily_installment_amount)}</strong></span>
-                </div>
-              )}
-            </div>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting || !collectorId || !contractId || maxCoupons <= 0}
-              className="h-12 px-8 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg"
-              size="lg"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white/20 border-t-white rounded-full"></div>
-                  Menyimpan...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Simpan Serah Terima
-                </>
-              )}
-            </Button>
+          {/* Status Auto-Save */}
+          <div className="flex items-center gap-3 pt-4 text-sm">
+            {isSubmitting ? (
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Menyimpan serah terima...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span>
+                  Pilih kontrak pada dropdown — serah terima akan otomatis tersimpan.
+                </span>
+              </div>
+            )}
           </div>
         </form>
       </CardContent>
