@@ -168,16 +168,19 @@ export function DailyDueList({
   // Dialog state
   const [selected, setSelected] = useState<DueRow | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
+  const [extraNote, setExtraNote] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   // Default returnedCount = semua kupon LUNAS dalam batch (rollback ke "belum bayar")
   const openDialog = (row: DueRow) => {
     setSelected(row);
     setReturnedCount(row.paid_count);
+    setExtraNote("");
   };
   const closeDialog = () => {
     setSelected(null);
     setReturnedCount(0);
+    setExtraNote("");
   };
 
   // Core processor — modal "Belum Bayar": rollback N kupon LUNAS terakhir menjadi unpaid.
@@ -254,7 +257,7 @@ export function DailyDueList({
     const returned = Math.max(0, Math.min(returnedCount, selected.paid_count));
     setSubmitting(true);
     try {
-      await processRow(selected, returned, "");
+      await processRow(selected, returned, extraNote.trim());
       closeDialog();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
@@ -489,6 +492,19 @@ export function DailyDueList({
                   </div>
                 </AlertDescription>
               </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="extra-note" className="text-sm font-medium">
+                  Catatan <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
+                </Label>
+                <Textarea
+                  id="extra-note"
+                  value={extraNote}
+                  onChange={(e) => setExtraNote(e.target.value)}
+                  placeholder="Tambahkan alasan atau keterangan tambahan..."
+                  rows={3}
+                />
+              </div>
             </div>
           )}
 
