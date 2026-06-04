@@ -17,10 +17,11 @@ export const calculateLateDays = (dueDate: string | null | undefined): number =>
 
 /**
  * Hitung hari tanpa pembayaran sejak last payment
- * @param lastPaymentDate - Tanggal pembayaran terakhir
+ * @param lastPaymentDate - Tanggal pembayaran terakhir (atau createdAt untuk kontrak baru)
  * @returns Jumlah hari sejak pembayaran terakhir
  */
 export const calculateDaysSinceLastPayment = (lastPaymentDate: string | null | undefined): number => {
+  // Jika tidak ada data, dianggap belum pernah bayar (return 0 untuk sekarang, akan di-handle di determineContractStatus)
   if (!lastPaymentDate) return 0;
   
   const lastPayment = new Date(lastPaymentDate);
@@ -61,7 +62,14 @@ export const determineContractStatus = (input: ContractStatusInput): ContractSta
   const daysSinceLastPayment = input.daysSinceLastPayment ?? 0;
 
   // Rule khusus: tidak ada pembayaran 6 hari berturut-turut => MACET
+  // Atau: jika belum pernah bayar dan kontrak sudah lama => MACET
   if (daysSinceLastPayment >= 6) return 'macet';
+  
+  // Jika belum pernah ada pembayaran, hitung dari created_at
+  if (daysSinceLastPayment === 0 && input.createdAt) {
+    const daysSinceCreation = differenceInDays(new Date(), new Date(input.createdAt));
+    if (daysSinceCreation >= 6) return 'macet'; // Belum bayar selama 6+ hari sejak dibuat => MACET
+  }
 
   // Klasifikasi berdasarkan hari keterlambatan kupon (1 kupon = 1 hari)
   if (lateDays <= 0) return 'sangat_lancar';
