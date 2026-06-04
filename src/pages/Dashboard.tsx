@@ -101,6 +101,7 @@ export default function Dashboard() {
   const { data: dpMonthly } = useDpTotalMonthly(selectedMonth);
   const { data: dpYearly } = useDpTotalYearly(selectedYear);
   const { promptAdminNote } = useAdminNote();
+  const { data: commissionTiers } = useCommissionTiers();
 
   // Debug: log if any major hook has error
   useEffect(() => {
