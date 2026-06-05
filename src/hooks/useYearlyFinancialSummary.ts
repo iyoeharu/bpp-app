@@ -259,12 +259,21 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         });
       });
 
-      // Process payments — hanya untuk total_collected per bulan & tahun (cash)
-      (payments || []).forEach((p: any) => {
-        const amt = Number(p.amount_paid || 0);
+      // TERTAGIH tahunan & per bulan — sum kupon PAID dari kontrak yg dibuat di tahun ini
+      // (simetris dengan Sisa Tagihan). Alokasi ke bulan berdasarkan start_date kontrak.
+      const contractMonthKeyMap = new Map<string, string>();
+      (contracts || []).forEach((c: any) => {
+        if (c.start_date) {
+          contractMonthKeyMap.set(c.id, format(new Date(c.start_date), 'yyyy-MM'));
+        }
+      });
+      (allCoupons || []).forEach((c: any) => {
+        if (c.status !== 'paid') return;
+        const mk = contractMonthKeyMap.get(c.contract_id);
+        if (!mk) return;
+        const amt = Number(c.amount || 0);
         totalCollected += amt;
-        const monthKey = format(new Date(p.payment_date), 'yyyy-MM');
-        const md = monthlyData.get(monthKey);
+        const md = monthlyData.get(mk);
         if (md) md.collected += amt;
       });
 

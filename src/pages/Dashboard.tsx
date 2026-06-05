@@ -360,8 +360,8 @@ export default function Dashboard() {
           label="Tertagih"
           value={totalCollected}
           valueColor="text-teal-600"
-          subtitle="Pembayaran masuk bulan ini"
-          hoverInfo="Total uang yang benar-benar tertagih (cash inflow) dari pembayaran yang masuk bulan ini, lintas semua kontrak. Sinkron dengan kolom Tertagih di tab Keuntungan Harian."
+          subtitle="Kupon sudah dibayar dari kontrak baru bulan ini"
+          hoverInfo={`Tertagih untuk kontrak yang dibuat bulan ini.\nRumus: SUM(kupon PAID) untuk semua kontrak dengan start_date di bulan ini.\nSimetris dengan kartu Sisa Tagihan.`}
         />
 
         <StatCard
@@ -766,8 +766,8 @@ export default function Dashboard() {
                   label="Tertagih"
                   value={yearlyFinancial?.total_collected ?? 0}
                   valueColor="text-teal-600"
-                  subtitle={`Pembayaran masuk tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Total uang yang benar-benar tertagih (cash inflow) sepanjang tahun ${selectedYear.getFullYear()}.`}
+                  subtitle="Kupon sudah dibayar dari kontrak tahun ini"
+                  hoverInfo={`Tertagih untuk kontrak yang dibuat di tahun ${selectedYear.getFullYear()}.\nRumus: SUM(kupon PAID) untuk semua kontrak dengan start_date di tahun ini.\nSimetris dengan kartu Sisa Tagihan.`}
                 />
 
                 <StatCard
