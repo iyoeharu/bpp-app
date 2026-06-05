@@ -33,7 +33,7 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
               <p className="text-lg font-bold">{data?.contracts_count ?? 0}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">Tagihan Periode</p>
+              <p className="text-xs text-muted-foreground">Total Nilai Kontrak</p>
               <p className="text-lg font-bold">{formatRupiah(data?.total_contract_value ?? 0)}</p>
             </div>
             <div className="rounded-md border p-3">
@@ -57,7 +57,7 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
                     <TableRow>
                       <TableHead>Sales</TableHead>
                       <TableHead className="text-right">Kontrak</TableHead>
-                       <TableHead className="text-right">Tagihan Periode</TableHead>
+                       <TableHead className="text-right">Nilai Kontrak</TableHead>
                        <TableHead className="text-right">Tertagih</TableHead>
                       <TableHead className="text-right">Sisa Tagihan</TableHead>
                     </TableRow>
@@ -103,7 +103,7 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
                       <TableHead>No. Kontrak</TableHead>
                       <TableHead>Pelanggan</TableHead>
                       <TableHead>Sales</TableHead>
-                       <TableHead className="text-right">Tagihan Periode</TableHead>
+                       <TableHead className="text-right">Nilai Kontrak</TableHead>
                        <TableHead className="text-right">Dibayar</TableHead>
                       <TableHead className="text-right">Sisa</TableHead>
                     </TableRow>

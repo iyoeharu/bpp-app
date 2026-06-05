@@ -40,11 +40,10 @@ export interface OutstandingDetailsSummary {
 
 /**
  * Detail sisa tagihan per kontrak untuk periode (bulan/tahun).
- * SINKRON dengan tab Keuntungan Harian:
- *   Tagihan periode  = SUM(installment_coupons.amount WHERE due_date dalam periode)
- *   Tertagih periode = SUM(payment_logs.amount_paid WHERE payment_date dalam periode)
- *   Sisa Tagihan     = max(0, Tagihan periode − Tertagih periode)
- * Mencakup SEMUA kontrak aktif yang punya kupon jatuh tempo di periode tsb.
+ * KONSEP: Kontrak BARU yg start_date-nya dalam periode, lalu jumlahkan kupon UNPAID-nya.
+ *   - contract_total = total nilai kontrak (semua kupon)
+ *   - paid_amount    = total kupon PAID (all-time)
+ *   - outstanding    = SUM kupon UNPAID (all-time)
  */
 const fetchOutstandingDetails = async (
   scope: 'monthly' | 'yearly',
@@ -59,41 +58,41 @@ const fetchOutstandingDetails = async (
 
   const [
     { data: contracts, error: cErr },
-    { data: periodPayments, error: pErr },
-    { data: periodCoupons, error: cpErr },
     { data: agents, error: aErr },
   ] = await Promise.all([
     supabase
       .from('credit_contracts')
       .select('id, contract_ref, start_date, status, sales_agent_id, total_loan_amount, daily_installment_amount, tenor_days, customers(name, phone)')
-      .neq('status', 'returned'),
-    supabase
-      .from('payment_logs')
-      .select('amount_paid, contract_id, payment_date')
-      .gte('payment_date', start)
-      .lte('payment_date', end),
-    supabase
-      .from('installment_coupons')
-      .select('contract_id, amount, due_date')
-      .gte('due_date', start)
-      .lte('due_date', end),
+      .neq('status', 'returned')
+      .gte('start_date', start)
+      .lte('start_date', end),
     supabase.from('sales_agents').select('id, name, agent_code'),
   ]);
 
   if (cErr) throw cErr;
-  if (pErr) throw pErr;
-  if (cpErr) throw cpErr;
   if (aErr) throw aErr;
 
+  const contractIds = (contracts || []).map((c: any) => c.id);
+  const unpaidByContract = new Map<string, number>();
   const paidByContract = new Map<string, number>();
-  (periodPayments || []).forEach((p: any) => {
-    paidByContract.set(p.contract_id, (paidByContract.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
-  });
+  const totalByContract = new Map<string, number>();
 
-  const tagihanByContract = new Map<string, number>();
-  (periodCoupons || []).forEach((c: any) => {
-    tagihanByContract.set(c.contract_id, (tagihanByContract.get(c.contract_id) || 0) + Number(c.amount || 0));
-  });
+  if (contractIds.length > 0) {
+    const { data: coupons, error: cpErr } = await supabase
+      .from('installment_coupons')
+      .select('contract_id, amount, status')
+      .in('contract_id', contractIds);
+    if (cpErr) throw cpErr;
+    (coupons || []).forEach((c: any) => {
+      const amt = Number(c.amount || 0);
+      totalByContract.set(c.contract_id, (totalByContract.get(c.contract_id) || 0) + amt);
+      if (c.status === 'unpaid') {
+        unpaidByContract.set(c.contract_id, (unpaidByContract.get(c.contract_id) || 0) + amt);
+      } else {
+        paidByContract.set(c.contract_id, (paidByContract.get(c.contract_id) || 0) + amt);
+      }
+    });
+  }
 
   const agentLookup = new Map<string, { name: string; code: string }>();
   (agents || []).forEach((a: any) => agentLookup.set(a.id, { name: a.name, code: a.agent_code }));
@@ -104,17 +103,10 @@ const fetchOutstandingDetails = async (
   let totalContractValue = 0;
   let totalPaid = 0;
 
-  // Kontrak yang relevan = punya tagihan atau pembayaran di periode
-  const relevantContractIds = new Set<string>([
-    ...tagihanByContract.keys(),
-    ...paidByContract.keys(),
-  ]);
-
   (contracts || []).forEach((c: any) => {
-    if (!relevantContractIds.has(c.id)) return;
-    const tagihan = tagihanByContract.get(c.id) || 0;
+    const tagihan = totalByContract.get(c.id) || Number(c.total_loan_amount || 0);
     const paid = paidByContract.get(c.id) || 0;
-    const outstanding = Math.max(0, tagihan - paid);
+    const outstanding = unpaidByContract.get(c.id) || 0;
     if (outstanding <= 0) return; // Hanya yang masih punya sisa
 
     const agentInfo = c.sales_agent_id ? agentLookup.get(c.sales_agent_id) : null;

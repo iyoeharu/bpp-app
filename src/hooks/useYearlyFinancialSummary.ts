@@ -83,10 +83,10 @@ export interface YearlyFinancialSummary {
  * dialokasikan ke bulan berdasarkan start_date kontrak.
  * Komisi: tier per total omset agen sepanjang tahun (full nilai kontrak).
  * 
- * SISA TAGIHAN (total_to_collect):
- * - Dihitung PER KONTRAK dari tahun terpilih
- * - Per kontrak: Sisa Tagihan = Total Nilai Kontrak (total_loan_amount) - Total Pembayaran (ALL TIME)
- * - Agregat: Sum dari sisa tagihan semua kontrak tahun itu yang masih memiliki sisa
+ * SISA TAGIHAN (total_to_collect) — KONTRAK BARU TAHUN INI:
+ * - Untuk kontrak yang start_date-nya di tahun ini, jumlahkan semua kupon
+ *   cicilan yang BELUM dibayar (status = 'unpaid').
+ * - Konsisten dengan Sisa Tagihan bulanan (yaitu sum dari semua bulan dlm tahun ini).
  * 
  * total_collected: Uang yang tertagih tahun ini (cash).
  * 
@@ -343,16 +343,14 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
       });
 
-      // SISA TAGIHAN tahunan — sinkron dengan tab Keuntungan Harian:
-      //   Tagihan tahun  = SUM(installment_coupons.amount WHERE due_date dalam tahun)
-      //   Tertagih tahun = totalCollected (sudah dihitung di atas)
-      //   Sisa Tagihan   = max(0, Tagihan − Tertagih)
-      const totalTagihanTahun = (allCoupons || []).reduce((s: number, c: any) => {
-        if (!c.due_date) return s;
-        if (c.due_date < yearStart || c.due_date > yearEnd) return s;
+      // SISA TAGIHAN tahunan — sum kupon UNPAID dari kontrak yg dibuat tahun ini
+      // (konsisten dengan Sisa Tagihan bulanan: sum semua bulan dalam tahun).
+      const contractIdsThisYear = new Set<string>((contracts || []).map((c: any) => c.id));
+      const totalToCollect = (allCoupons || []).reduce((s: number, c: any) => {
+        if (c.status !== 'unpaid') return s;
+        if (!contractIdsThisYear.has(c.contract_id)) return s;
         return s + Number(c.amount || 0);
       }, 0);
-      const totalToCollect = Math.max(0, totalTagihanTahun - totalCollected);
 
       const totalProfit = totalOmset - totalModal;
       const netProfit = totalProfit - totalCommission - totalExpenses;

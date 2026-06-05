@@ -41,10 +41,10 @@ export interface YearlyTargetData {
  * total_collected = uang masuk AKTUAL di bulan ini (cash) — info pelengkap.
  * Komisi: tier diterapkan ke total omset (full kontrak) per agen di bulan ini.
  * 
- * SISA TAGIHAN (total_to_collect) — SINKRON dengan tab Keuntungan Harian:
- *   Tagihan periode  = SUM(installment_coupons.amount WHERE due_date dalam bulan)
- *   Tertagih periode = SUM(payment_logs.amount_paid WHERE payment_date dalam bulan)
- *   Sisa Tagihan     = max(0, Tagihan periode − Tertagih periode)
+ * SISA TAGIHAN (total_to_collect) — KONTRAK BARU BULAN INI:
+ *   Untuk kontrak yang start_date-nya di bulan ini, jumlahkan semua kupon
+ *   cicilan yang BELUM dibayar (status = 'unpaid').
+ *   Rumus: SUM(installment_coupons.amount WHERE status='unpaid' AND contract_id IN kontrak_bulan_ini)
  */
 export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
@@ -57,7 +57,6 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
   { data: agents, error: agentsError },
   { data: contracts, error: contractsError },
   { data: paymentsThisMonth, error: paymentsError },
-  { data: couponsThisMonth, error: couponsError },
   { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
@@ -72,18 +71,12 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
           .select('amount_paid, payment_date, contract_id')
           .gte('payment_date', monthStart)
           .lte('payment_date', monthEnd),
-        supabase
-          .from('installment_coupons')
-          .select('amount, due_date, contract_id')
-          .gte('due_date', monthStart)
-          .lte('due_date', monthEnd),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
       if (paymentsError) throw paymentsError;
-      if (couponsError) throw couponsError;
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
@@ -132,17 +125,23 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + Number(p.amount_paid || 0));
       });
 
-      // Sinkron dengan Keuntungan Harian:
-      //   Tagihan periode  = SUM coupon.amount due dalam bulan ini
-      //   Tertagih periode = SUM payment_logs.amount_paid dalam bulan ini
-      //   Sisa Tagihan     = max(0, Tagihan − Tertagih)
-      const totalTagihanPeriode = (couponsThisMonth || []).reduce(
-        (s: number, c: any) => s + Number(c.amount || 0), 0
-      );
+      // Sisa Tagihan bulanan = sum kupon UNPAID dari kontrak yg dibuat bulan ini
+      const contractIdsThisMonth = (contracts || []).map((c: any) => c.id);
+      let totalSisaTagihan = 0;
+      if (contractIdsThisMonth.length > 0) {
+        const { data: unpaidCoupons, error: unpaidErr } = await supabase
+          .from('installment_coupons')
+          .select('amount')
+          .eq('status', 'unpaid')
+          .in('contract_id', contractIdsThisMonth);
+        if (unpaidErr) throw unpaidErr;
+        totalSisaTagihan = (unpaidCoupons || []).reduce(
+          (s: number, c: any) => s + Number(c.amount || 0), 0
+        );
+      }
       const totalTertagihPeriode = (paymentsThisMonth || []).reduce(
         (s: number, p: any) => s + Number(p.amount_paid || 0), 0
       );
-      const totalSisaTagihan = Math.max(0, totalTagihanPeriode - totalTertagihPeriode);
 
       const agentResults: MonthlyPerformanceData[] = (agents || []).map((agent) => {
         const data = agentDataMap.get(agent.id);
