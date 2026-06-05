@@ -343,24 +343,16 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
       });
 
-      // Aggregate all-time payments per contract
-      const paymentsByContract = new Map<string, number>();
-      (allPayments || []).forEach((p: any) => {
-        paymentsByContract.set(p.contract_id, (paymentsByContract.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
-      });
-
-      // Compute sisa tagihan per contract (note: contracts already filtered by DB)
-      // Sisa Tagihan = total_loan_amount - total_pembayaran_all_time
-      let totalToCollect = 0;
-      (contracts || []).forEach((c: any) => {
-        if (!c.start_date) return;
-        if (c.status === 'returned') return;
-
-        const contractTotal = Number(c.total_loan_amount || 0);
-        const paidAmount = paymentsByContract.get(c.id) || 0;
-        const sisaKontrak = Math.max(0, contractTotal - paidAmount);
-        totalToCollect += sisaKontrak;
-      });
+      // SISA TAGIHAN tahunan — sinkron dengan tab Keuntungan Harian:
+      //   Tagihan tahun  = SUM(installment_coupons.amount WHERE due_date dalam tahun)
+      //   Tertagih tahun = totalCollected (sudah dihitung di atas)
+      //   Sisa Tagihan   = max(0, Tagihan − Tertagih)
+      const totalTagihanTahun = (allCoupons || []).reduce((s: number, c: any) => {
+        if (!c.due_date) return s;
+        if (c.due_date < yearStart || c.due_date > yearEnd) return s;
+        return s + Number(c.amount || 0);
+      }, 0);
+      const totalToCollect = Math.max(0, totalTagihanTahun - totalCollected);
 
       const totalProfit = totalOmset - totalModal;
       const netProfit = totalProfit - totalCommission - totalExpenses;
