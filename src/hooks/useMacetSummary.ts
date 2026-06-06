@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { determineContractStatus, calculateLateDays, calculateDaysSinceLastPayment } from '@/lib/statusCalculation';
+import { determineContractStatus, calculateDaysSinceLastPayment } from '@/lib/statusCalculation';
 
 /**
  * Ringkasan kontrak MACET (status dinamis) — bukan returned.
@@ -51,7 +51,9 @@ const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSu
 
   const allIds = (contracts || []).map((c: any) => c.id);
 
-  // Real-time: ambil kupon unpaid (earliest due_date) & last payment per kontrak
+  // Real-time: ambil SEMUA kupon unpaid (untuk hitung jumlah overdue) & last payment per kontrak.
+  // Logika ini disinkronkan dengan useContractStatusMap (Riwayat Pelanggan) supaya status MACET
+  // di Dashboard identik dengan status di halaman Riwayat Pelanggan.
   const [{ data: unpaidCoupons, error: cErr }, { data: lastPays, error: lpErr }] = await Promise.all([
     allIds.length
       ? supabase
@@ -71,10 +73,15 @@ const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSu
   if (cErr) throw cErr;
   if (lpErr) throw lpErr;
 
-  const nextUnpaidByContract = new Map<string, string>();
+  // lateDays = jumlah kupon unpaid yg due_date sudah lewat (identik dgn useContractStatusMap)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const overdueCountByContract = new Map<string, number>();
+  const unpaidCountByContract = new Map<string, number>();
   (unpaidCoupons || []).forEach((c: any) => {
-    const prev = nextUnpaidByContract.get(c.contract_id);
-    if (!prev || c.due_date < prev) nextUnpaidByContract.set(c.contract_id, c.due_date);
+    unpaidCountByContract.set(c.contract_id, (unpaidCountByContract.get(c.contract_id) || 0) + 1);
+    if (c.due_date < todayStr) {
+      overdueCountByContract.set(c.contract_id, (overdueCountByContract.get(c.contract_id) || 0) + 1);
+    }
   });
 
   const lastPaymentByContract = new Map<string, string>();
@@ -86,13 +93,14 @@ const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSu
 
   // Hanya kontrak yang benar-benar MACET berdasarkan determineContractStatus
   const macetContracts = (contracts || []).filter((c: any) => {
-    const lateDays = calculateLateDays(nextUnpaidByContract.get(c.id));
+    const lateDays = overdueCountByContract.get(c.id) || 0;
+    const unpaidCount = unpaidCountByContract.get(c.id) || 0;
     const daysSinceLastPayment = calculateDaysSinceLastPayment(lastPaymentByContract.get(c.id));
+    const isCompleted = c.status === 'completed' || unpaidCount === 0;
     const status = determineContractStatus({
-      status: c.status,
+      status: isCompleted ? 'completed' : c.status,
       lateDays,
       daysSinceLastPayment,
-      createdAt: c.created_at,
     });
     return status === 'macet';
   });
@@ -215,10 +223,15 @@ const fetchMacetRealTime = async (rangeStart: string, rangeEnd: string): Promise
   if (cErr) throw cErr;
   if (lpErr) throw lpErr;
 
-  const nextUnpaidByContract = new Map<string, string>();
+  // lateDays = jumlah kupon unpaid yg due_date sudah lewat (identik dgn useContractStatusMap)
+  const todayStrRT = new Date().toISOString().split('T')[0];
+  const overdueCountRT = new Map<string, number>();
+  const unpaidCountRT = new Map<string, number>();
   (unpaidCoupons || []).forEach((c: any) => {
-    const prev = nextUnpaidByContract.get(c.contract_id);
-    if (!prev || c.due_date < prev) nextUnpaidByContract.set(c.contract_id, c.due_date);
+    unpaidCountRT.set(c.contract_id, (unpaidCountRT.get(c.contract_id) || 0) + 1);
+    if (c.due_date < todayStrRT) {
+      overdueCountRT.set(c.contract_id, (overdueCountRT.get(c.contract_id) || 0) + 1);
+    }
   });
 
   const lastPaymentByContract = new Map<string, string>();
@@ -230,13 +243,14 @@ const fetchMacetRealTime = async (rangeStart: string, rangeEnd: string): Promise
 
   // Filter REAL-TIME status = macet (status terkini hari ini, bukan saat dibuat)
   const macetContracts = (contracts || []).filter((c: any) => {
-    const lateDays = calculateLateDays(nextUnpaidByContract.get(c.id));
+    const lateDays = overdueCountRT.get(c.id) || 0;
+    const unpaidCount = unpaidCountRT.get(c.id) || 0;
     const daysSinceLastPayment = calculateDaysSinceLastPayment(lastPaymentByContract.get(c.id));
+    const isCompleted = c.status === 'completed' || unpaidCount === 0;
     const status = determineContractStatus({
-      status: c.status,
+      status: isCompleted ? 'completed' : c.status,
       lateDays,
       daysSinceLastPayment,
-      createdAt: c.created_at,
     });
     return status === 'macet';  // ← REAL-TIME status
   });
