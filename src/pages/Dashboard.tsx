@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt, Ban } from "lucide-react";
 import { useAdminNote } from "@/contexts/AdminNoteContext";
 import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
-import { useMacetSummary, useMacetSummaryYearly } from "@/hooks/useMacetSummary";
+import { useMacetSummary, useMacetSummaryYearly, useMacetSummaryRealTime } from "@/hooks/useMacetSummary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -88,7 +88,7 @@ export default function Dashboard() {
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
-  const { data: macetSummary } = useMacetSummary(selectedMonth);
+  const { data: macetSummary } = useMacetSummaryRealTime(selectedMonth);
   const { data: macetSummaryYearly } = useMacetSummaryYearly(selectedYear);
   const { data: outstandingMonthly } = useOutstandingDetailsMonthly(selectedMonth);
   const { data: outstandingYearly } = useOutstandingDetailsYearly(selectedYear);
@@ -358,10 +358,10 @@ export default function Dashboard() {
           icon={CheckCircle}
           iconColor="text-teal-500"
           label="Tertagih"
-          value={totalCollected}
+          value={monthlyData?.total_collected ?? 0}
           valueColor="text-teal-600"
-          subtitle="Kupon sudah dibayar dari kontrak baru bulan ini"
-          hoverInfo={`Tertagih untuk kontrak yang dibuat bulan ini.\nRumus: SUM(kupon PAID) untuk semua kontrak dengan start_date di bulan ini.\nSimetris dengan kartu Sisa Tagihan.`}
+          subtitle={`Kupon sudah dibayar dari kontrak baru ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`}
+          hoverInfo={`Total pembayaran dari kontrak yang start_date di bulan ini.\nRumus: SUM(kupon PAID) untuk kontrak baru bulan ini.\nSinkron dengan "Kalender Keuntungan Bulanan" di tab Keuntungan Harian.`}
         />
 
         <StatCard
@@ -370,8 +370,8 @@ export default function Dashboard() {
           label="Sisa Tagihan"
           value={monthlyData?.total_to_collect ?? 0}
           valueColor="text-red-600"
-          subtitle="Kupon belum dibayar dari kontrak baru bulan ini"
-          hoverInfo={`Sisa tagihan untuk kontrak yang dibuat bulan ini.\nRumus: SUM(kupon UNPAID) untuk semua kontrak dengan start_date di bulan ini.\n\nKlik Detail untuk lihat per sales & per kontrak.`}
+          subtitle={`Kupon belum dibayar dari kontrak baru ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`}
+          hoverInfo={`Total sisa tagihan dari kontrak yang start_date di bulan ini (status unpaid).\nRumus: SUM(kupon UNPAID) untuk kontrak baru bulan ini.\nSinkron dengan "Kalender Keuntungan Bulanan" di tab Keuntungan Harian.`}
           onDetailClick={() => { setOutstandingDetailScope('monthly'); setOutstandingDetailOpen(true); }}
         />
 

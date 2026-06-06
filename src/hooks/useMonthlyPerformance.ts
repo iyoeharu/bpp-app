@@ -178,8 +178,42 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_omset = agentResults.reduce((s, a) => s + a.total_omset, 0);
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
-      const total_collected = totalTertagihPeriode;
-      const total_to_collect = totalSisaTagihan;
+      
+      // ===== ACCRUAL BASIS (CICILAN BASIS) =====
+      // Tertagih & Sisa Tagihan dihitung dari CICILAN (kupon) kontrak bulan ini
+      // - Tertagih: Cicilan yang DUE di bulan ini (due_date antara monthStart-monthEnd)
+      // - Sisa Tagihan: Cicilan yang DUE di bulan selanjutnya atau kemudian
+      
+      let total_tertagih_accrual = 0;
+      let total_sisa_tagihan_accrual = 0;
+      
+      if (contractIdsThisMonth.length > 0) {
+        // Ambil SEMUA kupon dari kontrak bulan ini (tidak peduli status paid/unpaid)
+        const { data: allCoupons, error: allCouponsErr } = await supabase
+          .from('installment_coupons')
+          .select('amount, due_date')
+          .in('contract_id', contractIdsThisMonth);
+        if (allCouponsErr) throw allCouponsErr;
+        
+        (allCoupons || []).forEach((c: any) => {
+          const amt = Number(c.amount || 0);
+          const dueDate = new Date(c.due_date);
+          const monthStartDate = new Date(monthStart);
+          const monthEndDate = new Date(monthEnd);
+          
+          // Cicilan yang DUE di bulan ini
+          if (dueDate >= monthStartDate && dueDate <= monthEndDate) {
+            total_tertagih_accrual += amt;
+          }
+          // Cicilan yang DUE di bulan depan atau lebih
+          else if (dueDate > monthEndDate) {
+            total_sisa_tagihan_accrual += amt;
+          }
+        });
+      }
+      
+      const total_collected = total_tertagih_accrual;
+      const total_to_collect = total_sisa_tagihan_accrual;
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {
