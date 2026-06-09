@@ -57,25 +57,20 @@ export interface ContractStatusInput {
 export const determineContractStatus = (input: ContractStatusInput): ContractStatus => {
   // Jika kontrak selesai
   if (input.status === 'completed') return 'completed';
-  
-  const lateDays = input.lateDays ?? 0;
-  const daysSinceLastPayment = input.daysSinceLastPayment ?? 0;
 
-  // Rule khusus: tidak ada pembayaran 6 hari berturut-turut => MACET
-  // Atau: jika belum pernah bayar dan kontrak sudah lama => MACET
-  if (daysSinceLastPayment >= 6) return 'macet';
-  
-  // Jika belum pernah ada pembayaran, hitung dari created_at
-  if (daysSinceLastPayment === 0 && input.createdAt) {
+  // Basis status = jarak hari antara pembayaran (kupon) terakhir dengan hari ini.
+  // Jika belum pernah bayar, gunakan tanggal pembuatan kontrak sebagai acuan.
+  let gap = input.daysSinceLastPayment ?? 0;
+  if ((!input.daysSinceLastPayment || input.daysSinceLastPayment === 0) && input.createdAt) {
     const daysSinceCreation = differenceInDays(new Date(), new Date(input.createdAt));
-    if (daysSinceCreation >= 6) return 'macet'; // Belum bayar selama 6+ hari sejak dibuat => MACET
+    if (daysSinceCreation > gap) gap = daysSinceCreation;
   }
 
-  // Klasifikasi berdasarkan hari keterlambatan kupon (1 kupon = 1 hari)
-  if (lateDays <= 0) return 'sangat_lancar';
-  if (lateDays <= 3) return 'lancar';         // 1-3 hari
-  if (lateDays <= 19) return 'kurang_lancar'; // 4-19 hari
-  return 'macet';                              // >= 20 hari
+  // Threshold: 0 = Sangat Lancar, 1-3 = Lancar, 4-19 = Kurang Lancar, >=20 = Macet
+  if (gap <= 0) return 'sangat_lancar';
+  if (gap <= 3) return 'lancar';
+  if (gap <= 19) return 'kurang_lancar';
+  return 'macet';
 };
 
 /**
