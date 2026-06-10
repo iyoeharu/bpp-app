@@ -476,16 +476,12 @@ export default function Customers() {
                       variant="ghost"
                       className="h-6 px-2 text-xs"
                       onClick={() => {
-                        setFormData({
-                          name: existing.name,
-                          nik: existing.nik || '',
-                          address: existing.address || '',
-                          business_address: existing.business_address || '',
-                          phone: existing.phone || '',
-                        });
+                        setDialogOpen(false);
+                        toast.success(`Menggunakan data ${existing.name}`);
+                        navigate(`/contracts?newCustomerId=${existing.id}`);
                       }}
                     >
-                      Gunakan data
+                      Gunakan data & Buat Kontrak
                     </Button>
                   </div>
                 );
