@@ -165,6 +165,22 @@ export function DailyDueList({
     );
   }, [rows, searchQuery]);
 
+  // Grup berdasarkan nama pelanggan — jika pelanggan sama, tumpuk batch-nya dalam 1 baris
+  const groupedRows = useMemo(() => {
+    const map = new Map<string, DueRow[]>();
+    for (const r of filteredRows) {
+      const key = r.customer_name;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).map(([customer_name, batches]) => ({
+      customer_name,
+      batches,
+      total_unpaid_count: batches.reduce((s, b) => s + b.unpaid_count, 0),
+      total_unpaid_amount: batches.reduce((s, b) => s + b.unpaid_count * b.daily_amount, 0),
+    }));
+  }, [filteredRows]);
+
   // Dialog state
   const [selected, setSelected] = useState<DueRow | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
