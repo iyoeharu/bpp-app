@@ -82,6 +82,7 @@ export default function Contracts() {
   const { data: customers } = useCustomers();
   const { data: salesAgents } = useSalesAgents();
   const { data: collectors } = useCollectors();
+  const { data: contractStatusMap } = useContractStatusMap();
   const createContract = useCreateContract();
   const updateContract = useUpdateContract();
   const deleteContract = useDeleteContract();
