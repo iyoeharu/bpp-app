@@ -28,6 +28,7 @@ export interface ContractWithCustomer extends CreditContract {
     address: string | null;
     business_address: string | null;
     phone: string | null;
+    nik: string | null;
   } | null;
   sales_agents?: { name: string; agent_code: string } | null;
   collectors?: { name: string; collector_code: string } | null;
@@ -40,7 +41,7 @@ export const useContracts = (status?: string) => {
     queryFn: async () => {
       let query = supabase
         .from('credit_contracts')
-        .select('*, customers(name, address, business_address, phone), sales_agents(name, agent_code), collectors(name, collector_code)')
+        .select('*, customers(name, address, business_address, phone, nik), sales_agents(name, agent_code), collectors(name, collector_code)')
         .order('created_at', { ascending: false });
       
       if (status) {

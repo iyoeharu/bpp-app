@@ -471,6 +471,14 @@ export default function CustomerHistory() {
                 {/* Informasi Alamat & Kode */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2 border-t">
                   <div>
+                    <p className="text-sm text-muted-foreground">NIK</p>
+                    <p className="font-medium text-sm">{selectedContract.customers?.nik || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">No HP</p>
+                    <p className="font-medium text-sm">{selectedContract.customers?.phone || "-"}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">Alamat Rumah</p>
                     <p className="font-medium text-sm">{selectedContract.customers?.address || "-"}</p>
                   </div>
