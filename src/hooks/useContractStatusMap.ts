@@ -52,7 +52,18 @@ export const useContractStatusMap = () => {
             .order('contract_id')
       );
 
-      // 2. Semua pembayaran (contract_id, payment_date) untuk last payment per kontrak
+      // 2. Tanggal kupon terakhir yang sudah dibayar (berdasarkan due_date kupon paid)
+      //    Gap "macet" dihitung dari due_date kupon terakhir yang telah dibayar,
+      //    BUKAN dari tanggal input payment_log.
+      const paidCoupons = await fetchAll<{ contract_id: string; due_date: string }>(
+        () =>
+          supabase
+            .from('installment_coupons')
+            .select('contract_id, due_date')
+            .eq('status', 'paid')
+            .order('due_date', { ascending: false })
+      );
+      // Untuk Tgl Lunas: tetap ambil payment_date terakhir dari payment_logs
       const payments = await fetchAll<{ contract_id: string; payment_date: string }>(
         () =>
           supabase
@@ -76,6 +87,13 @@ export const useContractStatusMap = () => {
         unpaidByContract.set(c.contract_id, prev);
       }
 
+      // Map: due_date kupon paid terakhir (dipakai utk hitung gap macet)
+      const lastPaidDueByContract = new Map<string, string>();
+      for (const c of paidCoupons) {
+        const cur = lastPaidDueByContract.get(c.contract_id);
+        if (!cur || c.due_date > cur) lastPaidDueByContract.set(c.contract_id, c.due_date);
+      }
+      // Map: payment_date terakhir (dipakai utk Tgl Lunas)
       const lastPaymentByContract = new Map<string, string>();
       for (const p of payments) {
         if (!lastPaymentByContract.has(p.contract_id)) {
@@ -87,11 +105,12 @@ export const useContractStatusMap = () => {
       for (const ct of contracts as Array<{ id: string; status: string; created_at?: string }>) {
         const unpaidInfo = unpaidByContract.get(ct.id) ?? { lateDays: 0, unpaidCount: 0 };
         const lastPay = lastPaymentByContract.get(ct.id) ?? null;
+        const lastPaidDue = lastPaidDueByContract.get(ct.id) ?? null;
         const isCompleted = ct.status === 'completed' || unpaidInfo.unpaidCount === 0;
-        // Hari sejak pembayaran terakhir (untuk rule 6 hari -> macet)
+        // Hari sejak due_date kupon terakhir yang sudah dibayar (untuk rule >20 hari -> macet)
         let daysSinceLastPayment = 0;
-        if (lastPay) {
-          const last = new Date(lastPay);
+        if (lastPaidDue) {
+          const last = new Date(lastPaidDue);
           last.setHours(0, 0, 0, 0);
           daysSinceLastPayment = Math.max(
             0,

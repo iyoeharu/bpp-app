@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Check, ChevronsUpDown, Send, Users, FileText, Calendar, MessageSquare, DollarSign, Hash, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const startIndex = selectedContract ? selectedContract.current_installment_index + 1 : 1;
   const endIndex = startIndex + couponCount - 1;
   const maxCoupons = selectedContract ? selectedContract.tenor_days - selectedContract.current_installment_index : 0;
-  const submittedRef = useRef<string | null>(null);
+  const canSubmit = !!collectorId && !!contractId && couponCount >= 1 && couponCount <= maxCoupons && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
   const filteredContracts = collectorId
@@ -87,7 +87,6 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     const c = contracts?.find(x => x.id === contractId);
     if (c && c.collector_id !== collectorId) {
       setContractId("");
-      submittedRef.current = null;
     }
   }, [collectorId, contractId, contracts]);
 
@@ -116,15 +115,13 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     setNotes("");
   };
 
-  // AUTO-SAVE: setelah kontrak dipilih (dan kolektor ter-resolve), simpan otomatis.
-  useEffect(() => {
-    if (!contractId || !collectorId || isSubmitting) return;
-    if (submittedRef.current === contractId) return;
-    if (!selectedContract || maxCoupons <= 0) return;
-    submittedRef.current = contractId;
-    void handleSubmit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contractId, collectorId, selectedContract?.id, maxCoupons, isSubmitting]);
+  // Enter untuk submit ketika semua syarat terpenuhi
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === "Enter" && canSubmit) {
+      e.preventDefault();
+      void handleSubmit();
+    }
+  };
 
   return (
     <Card className="shadow-sm border-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
@@ -149,7 +146,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
         </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
           {/* STEP 1: Input jumlah kupon, tanggal, catatan terlebih dahulu */}
           <div className="rounded-lg border border-orange-200/60 dark:border-orange-800/40 bg-white/60 dark:bg-gray-900/40 p-4">
             <div className="flex items-center gap-2 mb-4">
@@ -434,21 +431,31 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
             </div>
           )}
 
-          {/* Status Auto-Save */}
-          <div className="flex items-center gap-3 pt-4 text-sm">
-            {isSubmitting ? (
-              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Menyimpan serah terima...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span>
-                  Isi jumlah kupon terlebih dahulu, lalu pilih kontrak — serah terima akan otomatis tersimpan.
-                </span>
-              </div>
-            )}
+          {/* Tombol Konfirmasi */}
+          <div className="flex items-center justify-between gap-3 pt-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span>
+                Pastikan kontrak terpilih & jumlah kupon terisi. Tekan Enter atau klik tombol untuk menyimpan.
+              </span>
+            </div>
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Simpan Serah Terima
+                </>
+              )}
+            </Button>
           </div>
         </form>
       </CardContent>
