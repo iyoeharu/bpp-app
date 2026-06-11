@@ -373,27 +373,32 @@ export function DailyDueList({
                       (s, b) => s + b.daily_amount * b.unpaid_count,
                       0,
                     );
+                    const uniq = (arr: string[]) =>
+                      Array.from(new Set(arr.filter(Boolean)));
+                    const contractRefs = uniq(group.batches.map((b) => b.contract_ref));
+                    const collectorNames = uniq(
+                      group.batches.map((b) => b.collector_name || "-"),
+                    );
+                    const allPaid = group.batches.every((b) => b.status === "paid");
+                    const allUnpaid = group.batches.every((b) => b.status === "unpaid");
+                    const mergedStatus: "paid" | "unpaid" | "partial" = allPaid
+                      ? "paid"
+                      : allUnpaid
+                        ? "unpaid"
+                        : "partial";
                     return (
                       <TableRow key={group.customer_name}>
-                        <TableCell className="font-mono text-sm align-top">
-                          <div className="flex flex-col gap-1">
-                            {group.batches.map((b) => (
-                              <span key={b.handover_id}>{b.contract_ref}</span>
-                            ))}
-                          </div>
+                        <TableCell className="font-mono text-sm">
+                          {contractRefs.join(", ")}
                         </TableCell>
-                        <TableCell className="font-medium align-top">
+                        <TableCell className="font-medium">
                           {group.customer_name}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground align-top">
-                          <div className="flex flex-col gap-1">
-                            {group.batches.map((b) => (
-                              <span key={b.handover_id}>{b.collector_name || "-"}</span>
-                            ))}
-                          </div>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {collectorNames.join(", ")}
                         </TableCell>
-                        <TableCell className="text-center align-top">
-                          <div className="flex flex-col items-center gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex flex-wrap items-center justify-center gap-1">
                             {group.batches.map((b) => (
                               <Badge
                                 key={b.handover_id}
@@ -405,28 +410,22 @@ export function DailyDueList({
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell className="text-center align-top">
-                          <div className="flex flex-col items-center gap-1">
-                            {group.batches.map((b) => (
-                              <span key={b.handover_id}>
-                                {b.status === "paid" ? (
-                                  <Badge className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/20">
-                                    Lunas
-                                  </Badge>
-                                ) : b.status === "partial" ? (
-                                  <Badge className="bg-amber-500/15 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20">
-                                    Sebagian
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/20">
-                                    Belum Bayar
-                                  </Badge>
-                                )}
-                              </span>
-                            ))}
-                          </div>
+                        <TableCell className="text-center">
+                          {mergedStatus === "paid" ? (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/20">
+                              Lunas
+                            </Badge>
+                          ) : mergedStatus === "partial" ? (
+                            <Badge className="bg-amber-500/15 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20">
+                              Sebagian
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/20">
+                              Belum Bayar
+                            </Badge>
+                          )}
                         </TableCell>
-                        <TableCell className="text-center align-top">
+                        <TableCell className="text-center">
                           <Badge
                             variant="outline"
                             className="text-destructive border-destructive/40"
@@ -434,11 +433,11 @@ export function DailyDueList({
                             {group.total_unpaid_count} kupon
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-semibold align-top">
+                        <TableCell className="text-right font-semibold">
                           {formatRupiah(totalAmount)}
                         </TableCell>
-                        <TableCell className="text-right align-top">
-                          <div className="flex flex-col items-end gap-1">
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
                             {group.batches.map((b) => (
                               <Button
                                 key={b.handover_id}
@@ -451,7 +450,7 @@ export function DailyDueList({
                               >
                                 <AlertTriangle className="h-3.5 w-3.5" />
                                 {group.batches.length > 1
-                                  ? `Belum Bayar (${b.start_index}-${b.end_index})`
+                                  ? `${b.start_index}-${b.end_index}`
                                   : "Belum Bayar"}
                               </Button>
                             ))}
