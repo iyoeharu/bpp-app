@@ -184,42 +184,15 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       // - Tertagih: Cicilan yang DUE di bulan ini (due_date antara monthStart-monthEnd)
       // - Sisa Tagihan: Cicilan yang DUE di bulan selanjutnya atau kemudian
       
-      let total_tertagih_accrual = 0;
-      let total_sisa_tagihan_accrual = 0;
-      
-      if (contractIdsThisMonth.length > 0) {
-        // Ambil SEMUA kupon dari kontrak bulan ini (tidak peduli status paid/unpaid)
-        const { data: allCoupons, error: allCouponsErr } = await supabase
-          .from('installment_coupons')
-          .select('amount, due_date')
-          .in('contract_id', contractIdsThisMonth);
-        if (allCouponsErr) throw allCouponsErr;
-        
-        (allCoupons || []).forEach((c: any) => {
-          const amt = Number(c.amount || 0);
-          const dueDate = new Date(c.due_date);
-          const monthStartDate = new Date(monthStart);
-          const monthEndDate = new Date(monthEnd);
-          
-          // Cicilan yang DUE di bulan ini
-          if (dueDate >= monthStartDate && dueDate <= monthEndDate) {
-            total_tertagih_accrual += amt;
-          }
-          // Cicilan yang DUE di bulan depan atau lebih
-          else if (dueDate > monthEndDate) {
-            total_sisa_tagihan_accrual += amt;
-          }
-        });
-      }
-      
-      // TERTAGIH bulanan — acuan: Total Tertagih pada Keuntungan Harian (Kalender Bulanan)
-      // Rumus: SUM(payment_logs.amount_paid WHERE payment_date di bulan ini)
-      // Konsisten dengan MonthlyProfitView.totalCollected.
+      // SISA TAGIHAN bulanan = SUM kupon UNPAID untuk semua kontrak yg dibuat bulan ini
+      // (tidak peduli due_date — totalnya konsisten dgn yearly = sum semua bulan)
+      const total_to_collect = totalSisaTagihan;
+      // TERTAGIH bulanan = SUM payment_logs.amount_paid di bulan ini
       const total_collected = (paymentsThisMonth || []).reduce(
         (s, p: any) => s + Number(p.amount_paid || 0),
         0
       );
-      const total_to_collect = total_sisa_tagihan_accrual;
+
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
       return {
