@@ -218,9 +218,10 @@ export default function Dashboard() {
     const profit = yearlyFinancial?.total_profit ?? 0;
     const commission = yearlyCommissionTotal;
     const collector = yearlyOpCollectorSalaryTotal || collectorSalaryTotalYearly || 0;
+    const staff = yearlyOpStaffSalaryTotal || 0;
     const opsExcl = yearlyOperationalExclSalaries || 0;
-    return profit - commission - opsExcl - collector;
-  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOperationalExclSalaries]);
+    return profit - commission - opsExcl - collector - staff;
+  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOpStaffSalaryTotal, yearlyOperationalExclSalaries]);
 
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
