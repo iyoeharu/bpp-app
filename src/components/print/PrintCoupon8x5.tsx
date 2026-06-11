@@ -304,8 +304,8 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
   const couponPages = groupCouponsIntoPages(coupons);
 
   // Constants
-  const REKENING_NUMBER = "0082-0100-3537-567";
-  const KANTOR_NUMBER = "0821 8802 0656";
+  const REKENING_NUMBER = "7052-0101-4075-532";
+  const KANTOR_NUMBER = "0852 5882 5882";
   // Single source of truth: imported asset from src/assets (resolved & hashed by Vite)
   const bgDataUrl = BG_IMAGE;
 
@@ -474,7 +474,7 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
             </div>
             
             <div className="data-row">
-              <span className="label">A.N SUMBER MUTIARA ELEKTRONIK</span>
+              <span className="label">A.N MUHAMMAD ZAYADI</span>
             </div>
 
                     </div>
