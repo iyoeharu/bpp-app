@@ -55,17 +55,18 @@ export interface ContractStatusInput {
  * @returns Status kontrak
  */
 export const determineContractStatus = (input: ContractStatusInput): ContractStatus => {
-  // Jika kontrak selesai
   if (input.status === 'completed') return 'completed';
 
-  // ATURAN ABSOLUT: Macet HANYA jika gap pembayaran > 20 hari.
-  // Tidak ada aturan lain (6-hari rule / fallback createdAt) yang boleh menimpa.
+  const lateDays = input.lateDays ?? 0;
   const gap = input.daysSinceLastPayment ?? 0;
 
-  if (gap > 20) return 'macet';
-  if (gap <= 0) return 'sangat_lancar';
-  if (gap <= 3) return 'lancar';
-  return 'kurang_lancar'; // 4 - 20 hari
+  // Macet: kupon overdue > 20 ATAU gap pembayaran > 20 hari
+  if (lateDays > 20 || gap > 20) return 'macet';
+
+  // Klasifikasi berdasarkan jumlah kupon overdue (= jumlah hari terlambat)
+  if (lateDays === 0) return 'sangat_lancar';
+  if (lateDays <= 3) return 'lancar';
+  return 'kurang_lancar'; // 4 - 20
 };
 
 /**

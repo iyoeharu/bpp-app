@@ -36,32 +36,29 @@ export interface YearlyTargetData {
 }
 
 /**
- * Performa bulanan — CONTRACT BASIS.
- * Omset/Modal/Profit diakui PENUH untuk setiap kontrak yang start_date nya di bulan ini.
- * total_collected (TERTAGIH) — KONTRAK BARU BULAN INI:
- *   Untuk kontrak yang start_date-nya di bulan ini, jumlahkan semua kupon
- *   cicilan yang SUDAH dibayar (status = 'paid').
- *   Rumus: SUM(installment_coupons.amount WHERE status='paid' AND contract_id IN kontrak_bulan_ini)
- *   (Simetris dengan Sisa Tagihan.)
- * Komisi: tier diterapkan ke total omset (full kontrak) per agen di bulan ini.
- * 
- * SISA TAGIHAN (total_to_collect) — KONTRAK BARU BULAN INI:
- *   Untuk kontrak yang start_date-nya di bulan ini, jumlahkan semua kupon
- *   cicilan yang BELUM dibayar (status = 'unpaid').
- *   Rumus: SUM(installment_coupons.amount WHERE status='unpaid' AND contract_id IN kontrak_bulan_ini)
+ * Performa bulanan — CONTRACT BASIS (akrual penuh).
+ *
+ * Modal/Omset/Profit/Komisi: untuk kontrak yang start_date-nya di bulan ini.
+ *
+ * TERTAGIH (total_collected) — BASIS KONTRAK BULAN INI:
+ *   SUM(payment_logs.amount_paid) untuk SEMUA kontrak yg start_date-nya
+ *   di bulan ini, tanpa memandang kapan payment_date-nya. Jadi pembayaran
+ *   yang masuk di bulan-bulan berikutnya tetap tercatat di bulan kontrak dibuat.
+ *
+ * SISA TAGIHAN (total_to_collect):
+ *   max(0, total_omset_bulan_ini − total_collected_bulan_ini)
  */
 export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['monthly_performance_contract', monthStart, monthEnd],
+    queryKey: ['monthly_performance_contract_v2', monthStart, monthEnd],
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
       const [
-  { data: agents, error: agentsError },
-  { data: contracts, error: contractsError },
-  { data: paymentsThisMonth, error: paymentsError },
-  { data: tiersData, error: tiersError },
+        { data: agents, error: agentsError },
+        { data: contracts, error: contractsError },
+        { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
         supabase
@@ -70,29 +67,24 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
           .neq('status', 'returned')
           .gte('start_date', monthStart)
           .lte('start_date', monthEnd),
-        supabase
-          .from('payment_logs')
-          .select('amount_paid, payment_date, contract_id')
-          .gte('payment_date', monthStart)
-          .lte('payment_date', monthEnd),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
-      if (paymentsError) throw paymentsError;
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
 
-      // Aggregate per agen — full contract values dari kontrak yg dibuat bulan ini
       const agentDataMap = new Map<string, {
         total_omset: number;
         total_modal: number;
         contract_ids: Set<string>;
       }>();
 
+      const contractAgentMap = new Map<string, string | null>();
       (contracts || []).forEach((c: any) => {
+        contractAgentMap.set(c.id, c.sales_agent_id || null);
         const agentId = c.sales_agent_id;
         if (!agentId) return;
         const existing = agentDataMap.get(agentId) || {
@@ -106,43 +98,23 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         agentDataMap.set(agentId, existing);
       });
 
-      // Sum uang masuk aktual per agen bulan ini (info pelengkap, dari kontrak manapun)
-      const contractAgentMapAll = new Map<string, string>();
-      // Perlu lookup agent dari kontrak yg pembayarannya masuk bulan ini, walau kontraknya dibuat bulan lain.
-      // Ambil agent_id dari payment_logs join contract via id (kontrak sudah di-fetch terbatas bulan ini saja),
-      // jadi untuk yang tidak ada di list, fetch tambahan agent mapping.
-      const paidContractIds = Array.from(new Set((paymentsThisMonth || []).map((p: any) => p.contract_id)));
-      if (paidContractIds.length > 0) {
-        const { data: contractAgents } = await supabase
-          .from('credit_contracts')
-          .select('id, sales_agent_id')
-          .in('id', paidContractIds);
-        (contractAgents || []).forEach((c: any) => {
-          if (c.sales_agent_id) contractAgentMapAll.set(c.id, c.sales_agent_id);
-        });
-      }
-
+      // TERTAGIH basis kontrak: semua payment_logs utk kontrak yg start bulan ini
+      const contractIdsThisMonth = Array.from(contractAgentMap.keys());
       const collectedByAgent = new Map<string, number>();
-      (paymentsThisMonth || []).forEach((p: any) => {
-        const agentId = contractAgentMapAll.get(p.contract_id);
-        if (!agentId) return;
-        collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + Number(p.amount_paid || 0));
-      });
-
-      // Sisa Tagihan & Tertagih bulanan = sum kupon dari kontrak yg dibuat bulan ini (simetris)
-      const contractIdsThisMonth = (contracts || []).map((c: any) => c.id);
-      let totalSisaTagihan = 0;
-      let totalTertagihPeriode = 0;
+      let totalCollectedThisMonth = 0;
       if (contractIdsThisMonth.length > 0) {
-        const { data: monthCoupons, error: couponsErr } = await supabase
-          .from('installment_coupons')
-          .select('amount, status')
+        const { data: allPayments, error: paymentsError } = await supabase
+          .from('payment_logs')
+          .select('amount_paid, contract_id')
           .in('contract_id', contractIdsThisMonth);
-        if (couponsErr) throw couponsErr;
-        (monthCoupons || []).forEach((c: any) => {
-          const amt = Number(c.amount || 0);
-          if (c.status === 'unpaid') totalSisaTagihan += amt;
-          else if (c.status === 'paid') totalTertagihPeriode += amt;
+        if (paymentsError) throw paymentsError;
+        (allPayments || []).forEach((p: any) => {
+          const amt = Number(p.amount_paid || 0);
+          totalCollectedThisMonth += amt;
+          const agentId = contractAgentMap.get(p.contract_id);
+          if (agentId) {
+            collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + amt);
+          }
         });
       }
 
@@ -167,7 +139,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
           total_modal,
           total_contracts,
           total_commission: totalCommission,
-          total_to_collect: 0,
+          total_to_collect: Math.max(0, total_omset - total_collected),
           total_collected,
           profit,
           profit_margin: profitMargin,
@@ -178,18 +150,8 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const total_omset = agentResults.reduce((s, a) => s + a.total_omset, 0);
       const total_profit = agentResults.reduce((s, a) => s + a.profit, 0);
       const total_commission = agentResults.reduce((s, a) => s + a.total_commission, 0);
-      
-      // ===== ACCRUAL BASIS (CICILAN BASIS) =====
-      // Tertagih & Sisa Tagihan dihitung dari CICILAN (kupon) kontrak bulan ini
-      // - Tertagih: Cicilan yang DUE di bulan ini (due_date antara monthStart-monthEnd)
-      // - Sisa Tagihan: Cicilan yang DUE di bulan selanjutnya atau kemudian
-      
-      // TERTAGIH bulanan = SUM payment_logs.amount_paid di bulan ini
-      const total_collected = (paymentsThisMonth || []).reduce(
-        (s, p: any) => s + Number(p.amount_paid || 0),
-        0
-      );
-      // SISA TAGIHAN bulanan = Total Omset bulan ini - Tertagih bulan ini (min 0)
+
+      const total_collected = totalCollectedThisMonth;
       const total_to_collect = Math.max(0, total_omset - total_collected);
 
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
