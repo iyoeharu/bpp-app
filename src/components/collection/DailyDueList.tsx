@@ -510,8 +510,7 @@ export function DailyDueList({
               Tandai Belum Bayar
             </DialogTitle>
             <DialogDescription>
-              {selected?.customer_name} • {selected?.contract_ref} • Batch{" "}
-              {selected?.start_index}-{selected?.end_index}
+              {selectedCustomer} • {selectedContractRefs}
             </DialogDescription>
           </DialogHeader>
 
@@ -519,17 +518,13 @@ export function DailyDueList({
             <div className="space-y-4">
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Kupon LUNAS dalam batch:</span>
-                  <span className="font-semibold">{selected.paid_count} kupon</span>
+                  <span className="text-muted-foreground">Kupon LUNAS:</span>
+                  <span className="font-semibold">{selectedTotalPaid} kupon</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nominal per kupon:</span>
-                  <span className="font-semibold">{formatRupiah(selected.daily_amount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total nilai batch:</span>
+                  <span className="text-muted-foreground">Total nilai LUNAS:</span>
                   <span className="font-bold text-primary">
-                    {formatRupiah(selected.daily_amount * selected.paid_count)}
+                    {formatRupiah(selectedTotalAmount)}
                   </span>
                 </div>
               </div>
@@ -542,14 +537,14 @@ export function DailyDueList({
                   id="returned-count"
                   type="number"
                   min={0}
-                  max={selected.paid_count}
+                  max={selectedTotalPaid}
                   value={returnedCount}
                   onChange={(e) =>
                     setReturnedCount(
                       Math.max(
                         0,
                         Math.min(
-                          selected.paid_count,
+                          selectedTotalPaid,
                           parseInt(e.target.value) || 0,
                         ),
                       ),
@@ -558,9 +553,9 @@ export function DailyDueList({
                   className="text-center font-semibold text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Default = semua kupon lunas dalam batch ini akan di-rollback menjadi{" "}
-                  <strong>belum bayar</strong>. Ubah jika hanya sebagian yang gagal
-                  ditagih. Pembayaran otomatis untuk kupon tsb akan dihapus.
+                  Default = semua kupon lunas akan di-rollback menjadi{" "}
+                  <strong>belum bayar</strong>. Sistem akan memproses dari kupon
+                  terakhir. Pembayaran otomatis untuk kupon tsb akan dihapus.
                 </p>
               </div>
 
@@ -580,19 +575,13 @@ export function DailyDueList({
                   <div className="flex justify-between">
                     <span>Tetap LUNAS:</span>
                     <span className="font-semibold">
-                      {selected.paid_count - returnedCount} kupon (
-                      {formatRupiah(
-                        selected.daily_amount *
-                          (selected.paid_count - returnedCount),
-                      )}
-                      )
+                      {selectedTotalPaid - returnedCount} kupon
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Di-rollback (belum bayar):</span>
                     <span className="font-semibold">
-                      {returnedCount} kupon (
-                      {formatRupiah(selected.daily_amount * returnedCount)})
+                      {returnedCount} kupon
                     </span>
                   </div>
                 </AlertDescription>
