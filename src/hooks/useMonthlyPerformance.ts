@@ -187,6 +187,11 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       // SISA TAGIHAN bulanan = SUM kupon UNPAID untuk semua kontrak yg dibuat bulan ini
       // (tidak peduli due_date — totalnya konsisten dgn yearly = sum semua bulan)
       const total_to_collect = totalSisaTagihan;
+      // TERTAGIH bulanan = SUM payment_logs.amount_paid di bulan ini
+      const total_collected = (paymentsThisMonth || []).reduce(
+        (s, p: any) => s + Number(p.amount_paid || 0),
+        0
+      );
 
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 
