@@ -192,7 +192,7 @@ export default function Auth() {
               <Home className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">CV SUMBER MUTIARA ELEKTRONIK</CardTitle>
+          <CardTitle className="text-2xl">CV MAHKOTA JAYA ELEKTRONIK</CardTitle>
           <CardDescription>
             Sistem Manajemen Kredit
           </CardDescription>

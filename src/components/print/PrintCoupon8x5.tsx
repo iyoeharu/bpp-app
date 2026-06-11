@@ -1,5 +1,5 @@
 import React from 'react';
-import BG_IMAGE from '@/assets/Background WM SME2.png'
+import BG_IMAGE from '@/assets/Mahkota-Jaya.svg';
 import { createPortal } from "react-dom";
 
 // --- Tipe Data ---
@@ -327,7 +327,7 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/png');
+          const dataUrl = canvas.toDataURL('image/svg');
           setBgDataUrl(dataUrl);
         } else {
           // fallback to original URL if canvas unavailable
