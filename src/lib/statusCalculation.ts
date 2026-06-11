@@ -58,19 +58,14 @@ export const determineContractStatus = (input: ContractStatusInput): ContractSta
   // Jika kontrak selesai
   if (input.status === 'completed') return 'completed';
 
-  // Basis status = jarak hari antara pembayaran (kupon) terakhir dengan hari ini.
-  // Jika belum pernah bayar, gunakan tanggal pembuatan kontrak sebagai acuan.
-  let gap = input.daysSinceLastPayment ?? 0;
-  if ((!input.daysSinceLastPayment || input.daysSinceLastPayment === 0) && input.createdAt) {
-    const daysSinceCreation = differenceInDays(new Date(), new Date(input.createdAt));
-    if (daysSinceCreation > gap) gap = daysSinceCreation;
-  }
+  // ATURAN ABSOLUT: Macet HANYA jika gap pembayaran > 20 hari.
+  // Tidak ada aturan lain (6-hari rule / fallback createdAt) yang boleh menimpa.
+  const gap = input.daysSinceLastPayment ?? 0;
 
-  // Threshold: 0 = Sangat Lancar, 1-3 = Lancar, 4-19 = Kurang Lancar, >=20 = Macet
+  if (gap > 20) return 'macet';
   if (gap <= 0) return 'sangat_lancar';
   if (gap <= 3) return 'lancar';
-  if (gap <= 20) return 'kurang_lancar';
-  return 'macet';
+  return 'kurang_lancar'; // 4 - 20 hari
 };
 
 /**
