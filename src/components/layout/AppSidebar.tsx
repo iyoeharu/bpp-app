@@ -32,7 +32,7 @@ const mainItems = [
 
 const masterItems = [
   { title: "Agen Sales", url: "/sales-agents", icon: Users },
-  { title: "Kolektor", url: "/collectors", icon: Users },
+  { title: "Gaji Karyawan", url: "/collectors", icon: Users },
   { title: "Pelanggan", url: "/customers", icon: UserCircle },
   { title: "Kontrak", url: "/contracts", icon: FileText },
   { title: "Hari Libur", url: "/holidays", icon: Calendar },

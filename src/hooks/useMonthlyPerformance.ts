@@ -184,24 +184,13 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       // - Tertagih: Cicilan yang DUE di bulan ini (due_date antara monthStart-monthEnd)
       // - Sisa Tagihan: Cicilan yang DUE di bulan selanjutnya atau kemudian
       
-      // SISA TAGIHAN bulanan = SUM kupon UNPAID dari SEMUA kontrak
-      // yang due_date-nya jatuh pada bulan ini (termasuk tenor lama yg belum dibayar)
-      const { data: unpaidCouponsDueThisMonth, error: unpaidErr } = await supabase
-        .from('installment_coupons')
-        .select('amount')
-        .eq('status', 'unpaid')
-        .gte('due_date', monthStart)
-        .lte('due_date', monthEnd);
-      if (unpaidErr) throw unpaidErr;
-      const total_to_collect = (unpaidCouponsDueThisMonth || []).reduce(
-        (s, c: any) => s + Number(c.amount || 0),
-        0
-      );
       // TERTAGIH bulanan = SUM payment_logs.amount_paid di bulan ini
       const total_collected = (paymentsThisMonth || []).reduce(
         (s, p: any) => s + Number(p.amount_paid || 0),
         0
       );
+      // SISA TAGIHAN bulanan = Total Omset bulan ini - Tertagih bulan ini (min 0)
+      const total_to_collect = Math.max(0, total_omset - total_collected);
 
       const profit_margin = total_modal > 0 ? (total_profit / total_modal) * 100 : 0;
 

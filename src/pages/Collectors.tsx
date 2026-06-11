@@ -54,6 +54,13 @@ import {
   useSetCollectorSalary,
   useCollectorSalaryTotal,
 } from "@/hooks/useCollectorSalaries";
+import {
+  useStaffSalaries,
+  useSetStaffSalary,
+  useDeleteStaffSalary,
+  useStaffSalaryTotal,
+  StaffSalaryRow,
+} from "@/hooks/useStaffSalaries";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -73,6 +80,54 @@ export default function Collectors() {
   const { data: salaryMap } = useCollectorSalaries(selectedMonth);
   const totalSalary = useCollectorSalaryTotal(selectedMonth);
   const setSalary = useSetCollectorSalary();
+
+  // Gaji posisi lain (string-based)
+  const { data: staffSalaries } = useStaffSalaries(selectedMonth);
+  const totalStaffSalary = useStaffSalaryTotal(selectedMonth);
+  const setStaffSalary = useSetStaffSalary();
+  const deleteStaffSalary = useDeleteStaffSalary();
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
+  const [staffPosition, setStaffPosition] = useState("");
+  const [staffAmount, setStaffAmount] = useState<number>(0);
+
+  const handleOpenStaffCreate = () => {
+    setStaffEditTarget(null);
+    setStaffPosition("");
+    setStaffAmount(0);
+    setStaffDialogOpen(true);
+  };
+  const handleOpenStaffEdit = (row: StaffSalaryRow) => {
+    setStaffEditTarget(row);
+    setStaffPosition(row.position);
+    setStaffAmount(row.amount);
+    setStaffDialogOpen(true);
+  };
+  const handleSaveStaff = async () => {
+    const pos = staffPosition.trim();
+    if (!pos) {
+      toast.error("Nama posisi wajib diisi");
+      return;
+    }
+    // Cek duplikasi posisi (kecuali saat edit row yg sama)
+    const dup = (staffSalaries || []).find(
+      (r) => r.position.toLowerCase() === pos.toLowerCase() && r.id !== staffEditTarget?.id
+    );
+    if (dup) {
+      toast.error(`Posisi "${pos}" sudah ada bulan ini`);
+      return;
+    }
+    await setStaffSalary.mutateAsync({
+      id: staffEditTarget?.id,
+      position: pos,
+      amount: staffAmount || 0,
+      month: selectedMonth,
+    });
+    setStaffDialogOpen(false);
+  };
+  const handleDeleteStaff = async (row: StaffSalaryRow) => {
+    await deleteStaffSalary.mutateAsync(row.id);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -267,7 +322,7 @@ export default function Collectors() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold">{t("Master Kolektor", "Master Kolektor")}</h2>
+        <h2 className="text-2xl font-bold">Gaji Karyawan</h2>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month Selector */}
           <div className="flex items-center gap-1">
@@ -565,6 +620,112 @@ export default function Collectors() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ===== Gaji Posisi Lain ===== */}
+      <div className="space-y-3 pt-4 border-t">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h3 className="text-xl font-bold">Gaji Posisi Lainnya</h3>
+          <Button onClick={handleOpenStaffCreate} variant="outline">
+            <Plus className="mr-2 h-4 w-4" /> Tambah Posisi
+          </Button>
+        </div>
+
+        <div className="rounded-lg border bg-blue-50 dark:bg-blue-900/10 px-4 py-3 flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-blue-500/15 flex items-center justify-center">
+            <Wallet className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground">
+              Total Gaji Posisi Lain — {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}
+            </p>
+            <p className="text-lg font-bold text-blue-700 dark:text-blue-400">{formatRupiah(totalStaffSalary)}</p>
+          </div>
+        </div>
+
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">#</TableHead>
+                <TableHead>Posisi / Jabatan</TableHead>
+                <TableHead className="text-right">Gaji Bulan Ini</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!staffSalaries || staffSalaries.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    Belum ada gaji posisi lain untuk bulan ini
+                  </TableCell>
+                </TableRow>
+              ) : (
+                staffSalaries.map((row, i) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{i + 1}</TableCell>
+                    <TableCell className="font-medium">{row.position}</TableCell>
+                    <TableCell className="text-right font-semibold text-blue-600">
+                      {formatRupiah(row.amount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenStaffEdit(row)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteStaff(row)}>
+                          <Trash className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <Dialog open={staffDialogOpen} onOpenChange={setStaffDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {staffEditTarget ? "Edit Gaji Posisi" : "Tambah Gaji Posisi"}
+            </DialogTitle>
+            <DialogDescription>
+              Bulan: {format(selectedMonth, "MMMM yyyy", { locale: idLocale })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama Posisi / Jabatan *</Label>
+              <Input
+                value={staffPosition}
+                onChange={(e) => setStaffPosition(e.target.value)}
+                placeholder="Contoh: Admin, Manajer, Sekretaris"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Gaji Bulan Ini</Label>
+              <CurrencyInput
+                value={staffAmount}
+                onValueChange={(val) => setStaffAmount(val || 0)}
+                placeholder="Rp 0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Otomatis dihitung sebagai biaya operasional di Dashboard.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStaffDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveStaff} disabled={setStaffSalary.isPending}>
+              {setStaffSalary.isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
