@@ -41,7 +41,7 @@ export const useContracts = (status?: string) => {
     queryFn: async () => {
       let query = supabase
         .from('credit_contracts')
-        .select('*, customers(name, address, business_address, phone), sales_agents(name, agent_code), collectors(name, collector_code)')
+        .select('*, customers(name, address, business_address, phone, nik), sales_agents(name, agent_code), collectors(name, collector_code)')
         .order('created_at', { ascending: false });
       
       if (status) {
