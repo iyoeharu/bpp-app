@@ -165,6 +165,22 @@ export function DailyDueList({
     );
   }, [rows, searchQuery]);
 
+  // Grup berdasarkan nama pelanggan — jika pelanggan sama, tumpuk batch-nya dalam 1 baris
+  const groupedRows = useMemo(() => {
+    const map = new Map<string, DueRow[]>();
+    for (const r of filteredRows) {
+      const key = r.customer_name;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).map(([customer_name, batches]) => ({
+      customer_name,
+      batches,
+      total_unpaid_count: batches.reduce((s, b) => s + b.unpaid_count, 0),
+      total_unpaid_amount: batches.reduce((s, b) => s + b.unpaid_count * b.daily_amount, 0),
+    }));
+  }, [filteredRows]);
+
   // Dialog state
   const [selected, setSelected] = useState<DueRow | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
@@ -315,7 +331,7 @@ export function DailyDueList({
             />
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-sm">
-                {filteredRows.length} batch
+                {groupedRows.length} pelanggan • {filteredRows.length} batch
               </Badge>
               <Badge variant="outline" className="text-sm">
                 {totalUnpaidCoupons} kupon • {formatRupiah(totalUnpaidAmount)}
@@ -352,59 +368,98 @@ export function DailyDueList({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRows.map((row) => (
-                    <TableRow key={row.handover_id}>
-                      <TableCell className="font-mono text-sm">
-                        {row.contract_ref}
-                      </TableCell>
-                      <TableCell className="font-medium">{row.customer_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {row.collector_name || "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {row.start_index}-{row.end_index}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {row.status === "paid" ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/20">
-                            Lunas
-                          </Badge>
-                        ) : row.status === "partial" ? (
-                          <Badge className="bg-amber-500/15 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20">
-                            Sebagian
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/20">
-                            Belum Bayar
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="text-destructive border-destructive/40">
-                          {row.unpaid_count} kupon
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {formatRupiah(row.daily_amount * row.unpaid_count)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
+                  {groupedRows.map((group) => {
+                    const totalAmount = group.batches.reduce(
+                      (s, b) => s + b.daily_amount * b.unpaid_count,
+                      0,
+                    );
+                    return (
+                      <TableRow key={group.customer_name}>
+                        <TableCell className="font-mono text-sm align-top">
+                          <div className="flex flex-col gap-1">
+                            {group.batches.map((b) => (
+                              <span key={b.handover_id}>{b.contract_ref}</span>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium align-top">
+                          {group.customer_name}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground align-top">
+                          <div className="flex flex-col gap-1">
+                            {group.batches.map((b) => (
+                              <span key={b.handover_id}>{b.collector_name || "-"}</span>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center align-top">
+                          <div className="flex flex-col items-center gap-1">
+                            {group.batches.map((b) => (
+                              <Badge
+                                key={b.handover_id}
+                                variant="secondary"
+                                className="font-mono text-xs"
+                              >
+                                {b.start_index}-{b.end_index}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center align-top">
+                          <div className="flex flex-col items-center gap-1">
+                            {group.batches.map((b) => (
+                              <span key={b.handover_id}>
+                                {b.status === "paid" ? (
+                                  <Badge className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/20">
+                                    Lunas
+                                  </Badge>
+                                ) : b.status === "partial" ? (
+                                  <Badge className="bg-amber-500/15 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20">
+                                    Sebagian
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/20">
+                                    Belum Bayar
+                                  </Badge>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center align-top">
+                          <Badge
                             variant="outline"
-                            onClick={() => openDialog(row)}
-                            disabled={row.paid_count <= 0}
-                            className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                            className="text-destructive border-destructive/40"
                           >
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            Belum Bayar
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {group.total_unpaid_count} kupon
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold align-top">
+                          {formatRupiah(totalAmount)}
+                        </TableCell>
+                        <TableCell className="text-right align-top">
+                          <div className="flex flex-col items-end gap-1">
+                            {group.batches.map((b) => (
+                              <Button
+                                key={b.handover_id}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openDialog(b)}
+                                disabled={b.paid_count <= 0}
+                                className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                                title={`Batch ${b.start_index}-${b.end_index}`}
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                {group.batches.length > 1
+                                  ? `Belum Bayar (${b.start_index}-${b.end_index})`
+                                  : "Belum Bayar"}
+                              </Button>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
