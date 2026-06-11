@@ -54,6 +54,13 @@ import {
   useSetCollectorSalary,
   useCollectorSalaryTotal,
 } from "@/hooks/useCollectorSalaries";
+import {
+  useStaffSalaries,
+  useSetStaffSalary,
+  useDeleteStaffSalary,
+  useStaffSalaryTotal,
+  StaffSalaryRow,
+} from "@/hooks/useStaffSalaries";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -73,6 +80,54 @@ export default function Collectors() {
   const { data: salaryMap } = useCollectorSalaries(selectedMonth);
   const totalSalary = useCollectorSalaryTotal(selectedMonth);
   const setSalary = useSetCollectorSalary();
+
+  // Gaji posisi lain (string-based)
+  const { data: staffSalaries } = useStaffSalaries(selectedMonth);
+  const totalStaffSalary = useStaffSalaryTotal(selectedMonth);
+  const setStaffSalary = useSetStaffSalary();
+  const deleteStaffSalary = useDeleteStaffSalary();
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
+  const [staffPosition, setStaffPosition] = useState("");
+  const [staffAmount, setStaffAmount] = useState<number>(0);
+
+  const handleOpenStaffCreate = () => {
+    setStaffEditTarget(null);
+    setStaffPosition("");
+    setStaffAmount(0);
+    setStaffDialogOpen(true);
+  };
+  const handleOpenStaffEdit = (row: StaffSalaryRow) => {
+    setStaffEditTarget(row);
+    setStaffPosition(row.position);
+    setStaffAmount(row.amount);
+    setStaffDialogOpen(true);
+  };
+  const handleSaveStaff = async () => {
+    const pos = staffPosition.trim();
+    if (!pos) {
+      toast.error("Nama posisi wajib diisi");
+      return;
+    }
+    // Cek duplikasi posisi (kecuali saat edit row yg sama)
+    const dup = (staffSalaries || []).find(
+      (r) => r.position.toLowerCase() === pos.toLowerCase() && r.id !== staffEditTarget?.id
+    );
+    if (dup) {
+      toast.error(`Posisi "${pos}" sudah ada bulan ini`);
+      return;
+    }
+    await setStaffSalary.mutateAsync({
+      id: staffEditTarget?.id,
+      position: pos,
+      amount: staffAmount || 0,
+      month: selectedMonth,
+    });
+    setStaffDialogOpen(false);
+  };
+  const handleDeleteStaff = async (row: StaffSalaryRow) => {
+    await deleteStaffSalary.mutateAsync(row.id);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -267,7 +322,7 @@ export default function Collectors() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold">{t("Master Kolektor", "Master Kolektor")}</h2>
+        <h2 className="text-2xl font-bold">Gaji Karyawan</h2>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month Selector */}
           <div className="flex items-center gap-1">
