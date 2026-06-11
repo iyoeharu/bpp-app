@@ -84,7 +84,7 @@ export default function Dashboard() {
   const { data: yearlyData, isLoading: isLoadingYearly } = useYearlyTarget(selectedYear);
   const { data: yearlyFinancial, isLoading: isLoadingYearlyFinancial } = useYearlyFinancialSummary(selectedYear);
   const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
-  const { total: opTotal, collectorSalaryTotal: opCollectorSalaryTotal, operationalExclSalaries } = useOperationalExpenseTotals(selectedMonth);
+  const { total: opTotal, collectorSalaryTotal: opCollectorSalaryTotal, staffSalaryTotal: opStaffSalaryTotal, operationalExclSalaries } = useOperationalExpenseTotals(selectedMonth);
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
@@ -97,7 +97,7 @@ export default function Dashboard() {
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
   const collectorSalaryTotalYearly = useCollectorSalaryTotalYearly(selectedYear);
-  const { total: yearlyOpTotal, collectorSalaryTotal: yearlyOpCollectorSalaryTotal, operationalExclSalaries: yearlyOperationalExclSalaries } = useOperationalExpenseTotalsYearly(selectedYear);
+  const { total: yearlyOpTotal, collectorSalaryTotal: yearlyOpCollectorSalaryTotal, staffSalaryTotal: yearlyOpStaffSalaryTotal, operationalExclSalaries: yearlyOperationalExclSalaries } = useOperationalExpenseTotalsYearly(selectedYear);
   const { data: dpMonthly } = useDpTotalMonthly(selectedMonth);
   const { data: dpYearly } = useDpTotalYearly(selectedYear);
   const { promptAdminNote } = useAdminNote();
