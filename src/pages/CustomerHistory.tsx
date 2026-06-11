@@ -573,20 +573,22 @@ export default function CustomerHistory() {
                     <TableRow>
                       <TableHead>Kupon</TableHead>
                       <TableHead>Tanggal</TableHead>
+                      <TableHead className="text-center" title="Kupon Bawa (diserahkan ke kolektor)">KB</TableHead>
+                      <TableHead className="text-center" title="Kupon Pulang (tidak terbayar)">KP</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
                       <TableHead>Kolektor</TableHead>
                       <TableHead>Catatan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loadingPayments ? (
+                    {(loadingPayments || loadingHandovers) ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center">Memuat...</TableCell>
+                        <TableCell colSpan={7} className="text-center">Memuat...</TableCell>
                       </TableRow>
                     ) : paginatedPayments?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">
-                          Belum ada pembayaran
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          Belum ada serah terima / pembayaran
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -600,6 +602,10 @@ export default function CustomerHistory() {
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                          <TableCell className="text-center font-medium">{payment.kb}</TableCell>
+                          <TableCell className={`text-center font-medium ${payment.kp > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {payment.kp}
+                          </TableCell>
                           <TableCell className="text-right font-medium">
                             {formatRupiah(payment.total_amount)}
                           </TableCell>
@@ -613,6 +619,7 @@ export default function CustomerHistory() {
                   </TableBody>
                 </Table>
               </div>
+
               
               {/* Payments pagination */}
               {totalPages > 1 && (
