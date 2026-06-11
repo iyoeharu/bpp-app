@@ -181,16 +181,25 @@ export function DailyDueList({
     }));
   }, [filteredRows]);
 
-  // Dialog state
-  const [selected, setSelected] = useState<DueRow | null>(null);
+  // Dialog state — selected dapat berisi 1 atau lebih batch (digabung per pelanggan)
+  const [selected, setSelected] = useState<DueRow[] | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [extraNote, setExtraNote] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Default returnedCount = semua kupon LUNAS dalam batch (rollback ke "belum bayar")
-  const openDialog = (row: DueRow) => {
-    setSelected(row);
-    setReturnedCount(row.paid_count);
+  const selectedTotalPaid = selected ? selected.reduce((s, r) => s + r.paid_count, 0) : 0;
+  const selectedTotalAmount = selected
+    ? selected.reduce((s, r) => s + r.paid_count * r.daily_amount, 0)
+    : 0;
+  const selectedCustomer = selected?.[0]?.customer_name || "";
+  const selectedContractRefs = selected
+    ? Array.from(new Set(selected.map((r) => r.contract_ref))).join(", ")
+    : "";
+
+  // Default returnedCount = semua kupon LUNAS dalam grup (rollback ke "belum bayar")
+  const openDialog = (rows: DueRow[]) => {
+    setSelected(rows);
+    setReturnedCount(rows.reduce((s, r) => s + r.paid_count, 0));
     setExtraNote("");
   };
   const closeDialog = () => {
@@ -283,13 +292,21 @@ export function DailyDueList({
       );
   };
 
-  // Submit dari modal "Belum Bayar" (manual)
+  // Submit dari modal "Belum Bayar" — distribusi rollback ke batch dari yang terbaru
   const handleSubmit = async () => {
-    if (!selected) return;
-    const returned = Math.max(0, Math.min(returnedCount, selected.paid_count));
+    if (!selected || selected.length === 0) return;
+    let remaining = Math.max(0, Math.min(returnedCount, selectedTotalPaid));
+    // Urutkan batch: kupon LUNAS terakhir terlebih dahulu (end_index DESC)
+    const ordered = [...selected].sort((a, b) => b.end_index - a.end_index);
     setSubmitting(true);
     try {
-      await processRow(selected, returned, extraNote.trim());
+      for (const row of ordered) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, row.paid_count);
+        if (take <= 0) continue;
+        await processRow(row, take, extraNote.trim());
+        remaining -= take;
+      }
       closeDialog();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
@@ -461,24 +478,18 @@ export function DailyDueList({
                           {formatRupiah(totalAmount)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-1">
-                            {group.batches.map((b) => (
-                              <Button
-                                key={b.handover_id}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openDialog(b)}
-                                disabled={b.paid_count <= 0}
-                                className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
-                                title={`Batch ${b.start_index}-${b.end_index}`}
-                              >
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                {group.batches.length > 1
-                                  ? `${b.start_index}-${b.end_index}`
-                                  : "Belum Bayar"}
-                              </Button>
-                            ))}
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              openDialog(group.batches.filter((b) => b.paid_count > 0))
+                            }
+                            disabled={group.batches.every((b) => b.paid_count <= 0)}
+                            className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Belum Bayar
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -499,8 +510,7 @@ export function DailyDueList({
               Tandai Belum Bayar
             </DialogTitle>
             <DialogDescription>
-              {selected?.customer_name} • {selected?.contract_ref} • Batch{" "}
-              {selected?.start_index}-{selected?.end_index}
+              {selectedCustomer} • {selectedContractRefs}
             </DialogDescription>
           </DialogHeader>
 
@@ -508,17 +518,13 @@ export function DailyDueList({
             <div className="space-y-4">
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Kupon LUNAS dalam batch:</span>
-                  <span className="font-semibold">{selected.paid_count} kupon</span>
+                  <span className="text-muted-foreground">Kupon LUNAS:</span>
+                  <span className="font-semibold">{selectedTotalPaid} kupon</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nominal per kupon:</span>
-                  <span className="font-semibold">{formatRupiah(selected.daily_amount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total nilai batch:</span>
+                  <span className="text-muted-foreground">Total nilai LUNAS:</span>
                   <span className="font-bold text-primary">
-                    {formatRupiah(selected.daily_amount * selected.paid_count)}
+                    {formatRupiah(selectedTotalAmount)}
                   </span>
                 </div>
               </div>
@@ -531,14 +537,14 @@ export function DailyDueList({
                   id="returned-count"
                   type="number"
                   min={0}
-                  max={selected.paid_count}
+                  max={selectedTotalPaid}
                   value={returnedCount}
                   onChange={(e) =>
                     setReturnedCount(
                       Math.max(
                         0,
                         Math.min(
-                          selected.paid_count,
+                          selectedTotalPaid,
                           parseInt(e.target.value) || 0,
                         ),
                       ),
@@ -547,9 +553,9 @@ export function DailyDueList({
                   className="text-center font-semibold text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Default = semua kupon lunas dalam batch ini akan di-rollback menjadi{" "}
-                  <strong>belum bayar</strong>. Ubah jika hanya sebagian yang gagal
-                  ditagih. Pembayaran otomatis untuk kupon tsb akan dihapus.
+                  Default = semua kupon lunas akan di-rollback menjadi{" "}
+                  <strong>belum bayar</strong>. Sistem akan memproses dari kupon
+                  terakhir. Pembayaran otomatis untuk kupon tsb akan dihapus.
                 </p>
               </div>
 
@@ -569,19 +575,13 @@ export function DailyDueList({
                   <div className="flex justify-between">
                     <span>Tetap LUNAS:</span>
                     <span className="font-semibold">
-                      {selected.paid_count - returnedCount} kupon (
-                      {formatRupiah(
-                        selected.daily_amount *
-                          (selected.paid_count - returnedCount),
-                      )}
-                      )
+                      {selectedTotalPaid - returnedCount} kupon
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Di-rollback (belum bayar):</span>
                     <span className="font-semibold">
-                      {returnedCount} kupon (
-                      {formatRupiah(selected.daily_amount * returnedCount)})
+                      {returnedCount} kupon
                     </span>
                   </div>
                 </AlertDescription>
