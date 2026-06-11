@@ -4,19 +4,23 @@ import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { startOfYear, endOfYear } from 'date-fns';
 import { useOperationalExpenses } from './useOperationalExpenses';
 import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from './useCollectorSalaries';
+import { useStaffSalaryTotal, useStaffSalaryTotalYearly } from './useStaffSalaries';
 
 export const useOperationalExpenseTotals = (month: Date = new Date()) => {
-  const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
-  const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
   const { data: expenses } = useOperationalExpenses(month);
   const collectorSalaryTotal = useCollectorSalaryTotal(month);
+  const staffSalaryTotal = useStaffSalaryTotal(month);
 
   const total = (expenses || []).reduce((s, e) => s + Number(e.amount || 0), 0);
-  const operationalExclSalaries = Math.max(0, total - (collectorSalaryTotal || 0));
+  const operationalExclSalaries = Math.max(
+    0,
+    total - (collectorSalaryTotal || 0) - (staffSalaryTotal || 0),
+  );
 
   return {
     total,
     collectorSalaryTotal: collectorSalaryTotal || 0,
+    staffSalaryTotal: staffSalaryTotal || 0,
     operationalExclSalaries,
     items: expenses || [],
   };
@@ -42,11 +46,16 @@ export const useOperationalExpenseTotalsYearly = (year: Date = new Date()) => {
 
   const total = (data || []).reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
   const collectorSalaryTotal = useCollectorSalaryTotalYearly(year) || 0;
-  const operationalExclSalaries = Math.max(0, total - collectorSalaryTotal);
+  const staffSalaryTotal = useStaffSalaryTotalYearly(year) || 0;
+  const operationalExclSalaries = Math.max(
+    0,
+    total - collectorSalaryTotal - staffSalaryTotal,
+  );
 
   return {
     total,
     collectorSalaryTotal,
+    staffSalaryTotal,
     operationalExclSalaries,
     items: data || [],
     error,
