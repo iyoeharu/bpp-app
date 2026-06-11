@@ -795,18 +795,18 @@ export default function Dashboard() {
                   valueColor="text-orange-600"
                   isNegative
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Total biaya operasional tahun ${selectedYear.getFullYear()} (tidak termasuk gaji kolektor).`}
+                  hoverInfo={`Total biaya operasional tahun ${selectedYear.getFullYear()} (tidak termasuk gaji karyawan & kolektor).`}
                 />
 
                 <StatCard
                   icon={Users}
                   iconColor="text-cyan-500"
-                  label="Gaji Kolektor"
-                  value={yearlyOpCollectorSalaryTotal}
+                  label="Gaji Karyawan"
+                  value={yearlyOpStaffSalaryTotal}
                   valueColor="text-cyan-600"
                   isNegative
-                  subtitle={`Total gaji tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo="Total gaji semua kolektor sepanjang tahun (dipisahkan dari biaya operasional)."
+                  subtitle={`Total gaji karyawan tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo="Total gaji karyawan (per posisi) sepanjang tahun. Dipisahkan dari biaya operasional dan diinput pada halaman Gaji Karyawan."
                 />
 
                 <StatCard
