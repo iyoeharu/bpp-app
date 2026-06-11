@@ -757,6 +757,16 @@ export default function Dashboard() {
                 />
 
                 <StatCard
+                  icon={Percent}
+                  iconColor="text-fuchsia-500"
+                  label="Bonus Tahunan 0.8%"
+                  value={(yearlyFinancial?.total_omset ?? 0) * 0.008}
+                  valueColor="text-fuchsia-600"
+                  subtitle={`0.8% × Total Omset ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Bonus tahunan flat 0.8% dari Total Omset tahun ${selectedYear.getFullYear()}.\nRumus: Total Omset × 0.8%\n= ${formatRupiah(yearlyFinancial?.total_omset ?? 0)} × 0.8%\n= ${formatRupiah((yearlyFinancial?.total_omset ?? 0) * 0.008)}\n\nTidak terkait dengan komisi performa sales per kontrak.`}
+                />
+
+                <StatCard
                   icon={CheckCircle}
                   iconColor="text-teal-500"
                   label="Tertagih"
