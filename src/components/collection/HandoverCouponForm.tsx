@@ -172,16 +172,30 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                   onChange={e => setCouponCount(parseInt(e.target.value) || 1)}
                   className="text-center font-semibold h-12 bg-white dark:bg-gray-900 border-orange-300 dark:border-orange-700"
                 />
-                {selectedContract && couponCount > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Kupon {startIndex} - {endIndex}
+                {/* Real-time range preview tepat di bawah input jumlah kupon */}
+                <div className="rounded-md border border-orange-300/60 dark:border-orange-700/60 bg-orange-50/70 dark:bg-orange-950/30 px-3 py-2">
+                  {selectedContract ? (
+                    couponCount > 0 ? (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-gray-600 dark:text-gray-300">
+                          Range Kupon:{" "}
+                          <span className="font-bold text-orange-700 dark:text-orange-300">
+                            #{startIndex} – #{endIndex}
+                          </span>
+                        </p>
+                        <p className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                          Total: {formatRupiah(couponCount * selectedContract.daily_installment_amount)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Masukkan jumlah kupon</p>
+                    )
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Range akan muncul setelah kontrak dipilih
                     </p>
-                    <p className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                      Total: {formatRupiah(couponCount * selectedContract.daily_installment_amount)}
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="space-y-3">
