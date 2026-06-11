@@ -226,6 +226,22 @@ export function DailyDueList({
       .eq("id", row.contract_id);
     if (cErr) throw cErr;
 
+    // 4) Simpan catatan unpaid ke coupon_handovers.notes (append, dengan tanda kutip)
+    if (extraNote) {
+      const { data: hRow } = await supabase
+        .from("coupon_handovers")
+        .select("notes")
+        .eq("id", row.handover_id)
+        .single();
+      const prev = (hRow?.notes || "").trim();
+      const appended = `"${extraNote}"`;
+      const merged = prev ? `${prev} ${appended}` : appended;
+      await supabase
+        .from("coupon_handovers")
+        .update({ notes: merged })
+        .eq("id", row.handover_id);
+    }
+
       logActivity.mutate({
         action: "DAILY_COLLECTION",
         entity_type: "payment",
