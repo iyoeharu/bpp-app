@@ -60,6 +60,31 @@ export const useStaffSalaryTotal = (month: Date = new Date()) => {
   return (data || []).reduce((s, r) => s + r.amount, 0);
 };
 
+export const useStaffSalaryTotalYearly = (year: Date = new Date()) => {
+  const yearNum = year.getFullYear();
+  const yearStart = `${yearNum}-01-01`;
+  const yearEnd = `${yearNum}-12-31`;
+
+  const { data } = useQuery({
+    queryKey: ['staff_salaries_yearly', yearStart, yearEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('operational_expenses')
+        .select('amount, notes')
+        .eq('category', CATEGORY)
+        .gte('expense_date', yearStart)
+        .lte('expense_date', yearEnd);
+      if (error) throw error;
+      return (data || []).reduce((s: number, r: any) => {
+        if (!(r.notes || '').match(POSITION_RE)) return s;
+        return s + Number(r.amount || 0);
+      }, 0);
+    },
+  });
+
+  return data ?? 0;
+};
+
 export const useSetStaffSalary = () => {
   const queryClient = useQueryClient();
 

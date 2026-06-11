@@ -84,7 +84,7 @@ export default function Dashboard() {
   const { data: yearlyData, isLoading: isLoadingYearly } = useYearlyTarget(selectedYear);
   const { data: yearlyFinancial, isLoading: isLoadingYearlyFinancial } = useYearlyFinancialSummary(selectedYear);
   const { data: expenses, isLoading: isLoadingExpenses } = useOperationalExpenses(selectedMonth);
-  const { total: opTotal, collectorSalaryTotal: opCollectorSalaryTotal, operationalExclSalaries } = useOperationalExpenseTotals(selectedMonth);
+  const { total: opTotal, collectorSalaryTotal: opCollectorSalaryTotal, staffSalaryTotal: opStaffSalaryTotal, operationalExclSalaries } = useOperationalExpenseTotals(selectedMonth);
   const { data: historyData, isLoading: isLoadingHistory } = useAgentContractHistory(selectedAgent?.id || null);
   const { data: returnedLoss } = useReturnedLoss(selectedMonth);
   const { data: returnedLossYearly } = useReturnedLossYearly(selectedYear);
@@ -97,7 +97,7 @@ export default function Dashboard() {
   const { createExpense, deleteExpense } = useOperationalExpenseMutations();
   const collectorSalaryTotal = useCollectorSalaryTotal(selectedMonth);
   const collectorSalaryTotalYearly = useCollectorSalaryTotalYearly(selectedYear);
-  const { total: yearlyOpTotal, collectorSalaryTotal: yearlyOpCollectorSalaryTotal, operationalExclSalaries: yearlyOperationalExclSalaries } = useOperationalExpenseTotalsYearly(selectedYear);
+  const { total: yearlyOpTotal, collectorSalaryTotal: yearlyOpCollectorSalaryTotal, staffSalaryTotal: yearlyOpStaffSalaryTotal, operationalExclSalaries: yearlyOperationalExclSalaries } = useOperationalExpenseTotalsYearly(selectedYear);
   const { data: dpMonthly } = useDpTotalMonthly(selectedMonth);
   const { data: dpYearly } = useDpTotalYearly(selectedYear);
   const { promptAdminNote } = useAdminNote();
@@ -185,9 +185,10 @@ export default function Dashboard() {
     const profit = monthlyData?.total_profit ?? 0;
     const commission = monthlyData?.total_commission ?? 0;
     const collector = opCollectorSalaryTotal || collectorSalaryTotal || 0;
+    const staff = opStaffSalaryTotal || 0;
     const opsExcl = operationalExclSalaries || 0;
-    return profit - commission - opsExcl - collector;
-  }, [monthlyData?.total_profit, monthlyData?.total_commission, opCollectorSalaryTotal, collectorSalaryTotal, operationalExclSalaries]);
+    return profit - commission - opsExcl - collector - staff;
+  }, [monthlyData?.total_profit, monthlyData?.total_commission, opCollectorSalaryTotal, collectorSalaryTotal, opStaffSalaryTotal, operationalExclSalaries]);
 
   // Margin keuntungan kotor: (omset - modal) / modal * 100
   const grossProfitMargin = useMemo(() => {
@@ -217,9 +218,10 @@ export default function Dashboard() {
     const profit = yearlyFinancial?.total_profit ?? 0;
     const commission = yearlyCommissionTotal;
     const collector = yearlyOpCollectorSalaryTotal || collectorSalaryTotalYearly || 0;
+    const staff = yearlyOpStaffSalaryTotal || 0;
     const opsExcl = yearlyOperationalExclSalaries || 0;
-    return profit - commission - opsExcl - collector;
-  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOperationalExclSalaries]);
+    return profit - commission - opsExcl - collector - staff;
+  }, [yearlyFinancial?.total_profit, yearlyCommissionTotal, yearlyOpCollectorSalaryTotal, collectorSalaryTotalYearly, yearlyOpStaffSalaryTotal, yearlyOperationalExclSalaries]);
 
   const locale = i18n.language === 'id' ? 'id-ID' : 'en-US';
 
@@ -378,19 +380,19 @@ export default function Dashboard() {
           value={operationalExclSalaries}
           valueColor="text-orange-600"
           isNegative
-          subtitle="Pengeluaran bulan ini (tidak termasuk gaji kolektor)"
-          hoverInfo="Total biaya operasional selain gaji kolektor (transport, komunikasi, dll)."
+          subtitle="Pengeluaran bulan ini (tidak termasuk gaji karyawan & kolektor)"
+          hoverInfo="Total biaya operasional selain gaji kolektor dan gaji karyawan (transport, komunikasi, dll)."
         />
 
         <StatCard
           icon={Users}
           iconColor="text-cyan-500"
-          label="Gaji Kolektor"
-          value={opCollectorSalaryTotal}
+          label="Gaji Karyawan"
+          value={opStaffSalaryTotal}
           valueColor="text-cyan-600"
           isNegative
-          subtitle="Total gaji bulan ini"
-          hoverInfo="Total gaji semua kolektor pada bulan ini (dipisahkan dari biaya operasional)."
+          subtitle="Total gaji karyawan bulan ini"
+          hoverInfo="Total gaji karyawan (per posisi) pada bulan ini. Dipisahkan dari biaya operasional dan diinput pada halaman Gaji Karyawan."
         />
 
         <StatCard
@@ -793,18 +795,18 @@ export default function Dashboard() {
                   valueColor="text-orange-600"
                   isNegative
                   subtitle={`Tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Total biaya operasional tahun ${selectedYear.getFullYear()} (tidak termasuk gaji kolektor).`}
+                  hoverInfo={`Total biaya operasional tahun ${selectedYear.getFullYear()} (tidak termasuk gaji karyawan & kolektor).`}
                 />
 
                 <StatCard
                   icon={Users}
                   iconColor="text-cyan-500"
-                  label="Gaji Kolektor"
-                  value={yearlyOpCollectorSalaryTotal}
+                  label="Gaji Karyawan"
+                  value={yearlyOpStaffSalaryTotal}
                   valueColor="text-cyan-600"
                   isNegative
-                  subtitle={`Total gaji tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo="Total gaji semua kolektor sepanjang tahun (dipisahkan dari biaya operasional)."
+                  subtitle={`Total gaji karyawan tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo="Total gaji karyawan (per posisi) sepanjang tahun. Dipisahkan dari biaya operasional dan diinput pada halaman Gaji Karyawan."
                 />
 
                 <StatCard
@@ -843,7 +845,7 @@ export default function Dashboard() {
                         {formatRupiah(yearlyNetProfit)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Keuntungan Kotor − Komisi 12B (sum real bulanan) − Biaya Operasional − Gaji Kolektor
+                        Keuntungan Kotor − Komisi 12B (sum real bulanan) − Biaya Operasional − Gaji Karyawan − Gaji Kolektor
                       </p>
                     </div>
                     <div className="text-right">
