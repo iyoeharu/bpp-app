@@ -181,16 +181,25 @@ export function DailyDueList({
     }));
   }, [filteredRows]);
 
-  // Dialog state
-  const [selected, setSelected] = useState<DueRow | null>(null);
+  // Dialog state — selected dapat berisi 1 atau lebih batch (digabung per pelanggan)
+  const [selected, setSelected] = useState<DueRow[] | null>(null);
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [extraNote, setExtraNote] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Default returnedCount = semua kupon LUNAS dalam batch (rollback ke "belum bayar")
-  const openDialog = (row: DueRow) => {
-    setSelected(row);
-    setReturnedCount(row.paid_count);
+  const selectedTotalPaid = selected ? selected.reduce((s, r) => s + r.paid_count, 0) : 0;
+  const selectedTotalAmount = selected
+    ? selected.reduce((s, r) => s + r.paid_count * r.daily_amount, 0)
+    : 0;
+  const selectedCustomer = selected?.[0]?.customer_name || "";
+  const selectedContractRefs = selected
+    ? Array.from(new Set(selected.map((r) => r.contract_ref))).join(", ")
+    : "";
+
+  // Default returnedCount = semua kupon LUNAS dalam grup (rollback ke "belum bayar")
+  const openDialog = (rows: DueRow[]) => {
+    setSelected(rows);
+    setReturnedCount(rows.reduce((s, r) => s + r.paid_count, 0));
     setExtraNote("");
   };
   const closeDialog = () => {
