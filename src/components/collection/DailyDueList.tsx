@@ -399,15 +399,39 @@ export function DailyDueList({
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex flex-wrap items-center justify-center gap-1">
-                            {group.batches.map((b) => (
-                              <Badge
-                                key={b.handover_id}
-                                variant="secondary"
-                                className="font-mono text-xs"
-                              >
-                                {b.start_index}-{b.end_index}
-                              </Badge>
-                            ))}
+                            {(() => {
+                              // Gabungkan range per kontrak: 1-10 + 10-15 (atau 11-15) → 1-15
+                              const byContract = new Map<string, { start: number; end: number }[]>();
+                              for (const b of group.batches) {
+                                const arr = byContract.get(b.contract_ref) || [];
+                                arr.push({ start: b.start_index, end: b.end_index });
+                                byContract.set(b.contract_ref, arr);
+                              }
+                              const merged: { ref: string; start: number; end: number }[] = [];
+                              for (const [ref, intervals] of byContract.entries()) {
+                                intervals.sort((a, b) => a.start - b.start);
+                                let cur = { ...intervals[0] };
+                                for (let i = 1; i < intervals.length; i++) {
+                                  const nx = intervals[i];
+                                  if (nx.start <= cur.end + 1) {
+                                    cur.end = Math.max(cur.end, nx.end);
+                                  } else {
+                                    merged.push({ ref, ...cur });
+                                    cur = { ...nx };
+                                  }
+                                }
+                                merged.push({ ref, ...cur });
+                              }
+                              return merged.map((m, i) => (
+                                <Badge
+                                  key={`${m.ref}-${i}`}
+                                  variant="secondary"
+                                  className="font-mono text-xs"
+                                >
+                                  {m.start}-{m.end}
+                                </Badge>
+                              ));
+                            })()}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
