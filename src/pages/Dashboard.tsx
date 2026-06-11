@@ -845,7 +845,7 @@ export default function Dashboard() {
                         {formatRupiah(yearlyNetProfit)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Keuntungan Kotor − Komisi 12B (sum real bulanan) − Biaya Operasional − Gaji Kolektor
+                        Keuntungan Kotor − Komisi 12B (sum real bulanan) − Biaya Operasional − Gaji Karyawan − Gaji Kolektor
                       </p>
                     </div>
                     <div className="text-right">
