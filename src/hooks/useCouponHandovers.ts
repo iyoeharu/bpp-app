@@ -45,6 +45,23 @@ export const useCouponHandovers = (date?: string) => {
   });
 };
 
+export const useHandoversByContract = (contractId: string | null) => {
+  return useQuery({
+    queryKey: ['coupon_handovers', 'contract', contractId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coupon_handovers')
+        .select('*, collectors(name, collector_code)')
+        .eq('contract_id', contractId!)
+        .order('handover_date', { ascending: false })
+        .order('start_index', { ascending: false });
+      if (error) throw error;
+      return data as CouponHandover[];
+    },
+    enabled: !!contractId,
+  });
+};
+
 export const useCreateCouponHandover = () => {
   const queryClient = useQueryClient();
   return useMutation({
