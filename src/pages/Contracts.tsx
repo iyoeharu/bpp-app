@@ -58,6 +58,8 @@ import { useContracts, useCreateContract, useUpdateContract, useDeleteContract, 
 import { useCustomers } from "@/hooks/useCustomers";
 import { useSalesAgents } from "@/hooks/useSalesAgents";
 import { useCollectors } from "@/hooks/useCollectors";
+import { useContractStatusMap } from "@/hooks/useContractStatusMap";
+import { getStatusLabel, getStatusBadgeClass } from "@/lib/statusCalculation";
 import { formatRupiah } from "@/lib/format";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
