@@ -233,7 +233,7 @@ export default function CustomerHistory() {
     ? differenceInDays(today, new Date(oldestOverdue))
     : 0;
   const lateNote = overdueCount > 0
-    ? `Terlambat ${overdueCount} kupon (${daysLate} hari sejak ${formatDate(oldestOverdue!)})`
+    ? `Terlambat ${overdueCount} kupon`
     : selectedContract?.status === 'completed'
       ? 'Kontrak telah lunas'
       : 'Tidak ada keterlambatan';
