@@ -766,8 +766,8 @@ export default function Dashboard() {
                   label="Tertagih"
                   value={yearlyFinancial?.total_collected ?? 0}
                   valueColor="text-teal-600"
-                  subtitle="Kupon sudah dibayar dari kontrak tahun ini"
-                  hoverInfo={`Tertagih untuk kontrak yang dibuat di tahun ${selectedYear.getFullYear()}.\nRumus: SUM(kupon PAID) untuk semua kontrak dengan start_date di tahun ini.\nSimetris dengan kartu Sisa Tagihan.`}
+                  subtitle="Gabungan Tertagih per bulan"
+                  hoverInfo={`Total Tertagih tahun ${selectedYear.getFullYear()} = jumlah dari Tertagih setiap bulan.\nRumus: SUM(payment_logs.amount_paid WHERE payment_date di tahun ini), dialokasikan per bulan.\nIdentik dengan jumlah 12 card Tertagih bulanan di dashboard.\nTotal: ${formatRupiah(yearlyFinancial?.total_collected ?? 0)}`}
                 />
 
                 <StatCard
