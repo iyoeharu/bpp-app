@@ -87,6 +87,7 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
               </div>
             </div>
           </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
