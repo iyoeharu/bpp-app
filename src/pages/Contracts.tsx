@@ -939,25 +939,15 @@ export default function Contracts() {
                   : "0";
                 const daysPerDueNum = parseFloat(daysPerDue);
                 
-                let statusVariant: "default" | "secondary" | "destructive" | "outline" = "default";
-                let statusLabel = "Lancar";
-                if (contract.status === "returned") {
-                  statusVariant = "destructive";
-                  statusLabel = "Macet (Return)";
-                } else if (contract.status !== "active") {
-                  statusVariant = "secondary";
-                  statusLabel = "Selesai";
-                } else if (daysPerDueNum <= 1.2) {
-                  statusVariant = "default";
-                  statusLabel = "Lancar";
-                } else if (daysPerDueNum <= 2.0) {
-                  statusVariant = "outline";
-                  statusLabel = "Kurang Lancar";
-                } else {
-                  statusVariant = "destructive";
-                  statusLabel = "Macet";
-                }
-                
+                const statusInfo = contractStatusMap?.get(contract.id);
+                const effectiveStatus = contract.status === "returned"
+                  ? "macet"
+                  : (statusInfo?.status ?? (contract.status === "completed" ? "completed" : "sangat_lancar"));
+                const statusLabel = contract.status === "returned"
+                  ? "Macet (Return)"
+                  : getStatusLabel(effectiveStatus as any);
+                const badgeClass = getStatusBadgeClass(effectiveStatus as any);
+
                 return (
                   <TableRow 
                     key={contract.id}
@@ -978,7 +968,7 @@ export default function Contracts() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant}>
+                      <Badge className={badgeClass} variant="outline">
                         {statusLabel}
                       </Badge>
                     </TableCell>
