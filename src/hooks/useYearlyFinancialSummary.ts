@@ -355,20 +355,17 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
       });
 
-      // SISA TAGIHAN tahunan = SUM kupon UNPAID dari SEMUA kontrak yang
-      // due_date-nya jatuh di tahun ini (termasuk tenor lama yg belum dibayar).
-      // Konsisten dgn Sisa Tagihan bulanan = sum semua bulan dalam tahun.
-      const totalToCollect = (allCoupons || []).reduce((s: number, c: any) => {
-        if (c.status !== 'unpaid') return s;
-        if (!c.due_date) return s;
-        if (c.due_date < yearStart || c.due_date > yearEnd) return s;
-        return s + Number(c.amount || 0);
-      }, 0);
-
-
       // TERTAGIH tahunan = gabungan (sum) dari Tertagih setiap bulan
       // (identik dengan jumlah 12 card Tertagih bulanan di dashboard)
       const totalCollected = Array.from(monthlyData.values()).reduce((s, m) => s + m.collected, 0);
+
+      // SISA TAGIHAN tahunan = SUM dari Sisa Tagihan bulanan
+      // Setiap bulan: max(0, total_omset_bulan − tertagih_bulan)  — identik dengan card bulanan.
+      const totalToCollect = Array.from(monthlyData.values()).reduce(
+        (s, m) => s + Math.max(0, m.total_omset - m.collected),
+        0,
+      );
+
 
       const totalProfit = totalOmset - totalModal;
       const netProfit = totalProfit - totalCommission - totalExpenses;
