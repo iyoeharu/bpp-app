@@ -601,7 +601,6 @@ export default function Dashboard() {
                       <TableHead>{t("dashboard.agentCode", "Kode Sales")}</TableHead>
                       <TableHead className="text-right">{t("dashboard.modal", "Modal")}</TableHead>
                       <TableHead className="text-right">{t("dashboard.omset", "Omset")}</TableHead>
-                      <TableHead className="text-right">{t("dashboard.profit", "Keuntungan")}</TableHead>
                       <TableHead className="text-right">{t("dashboard.profitMargin", "Margin %")}</TableHead>
                       <TableHead className="text-right">{t("dashboard.commission", "Komisi")}</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
@@ -623,7 +622,6 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
                         <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
-                        <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
                         <TableCell className="text-right text-emerald-600">{agent.profit_margin.toFixed(1)}%</TableCell>
                         <TableCell className="text-right text-purple-600">{formatRupiah(agent.total_commission)}</TableCell>
                         <TableCell>
@@ -633,7 +631,7 @@ export default function Dashboard() {
                     ))}
                     {paginatedAgents.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           {t("dashboard.noAgentData", "Belum ada data sales agent bulan ini")}
                         </TableCell>
                       </TableRow>
@@ -927,7 +925,7 @@ export default function Dashboard() {
                           <TableHead>Kode Sales</TableHead>
                           <TableHead className="text-right">Modal</TableHead>
                           <TableHead className="text-right">Omset</TableHead>
-                          <TableHead className="text-right">Keuntungan</TableHead>
+                          
                           <TableHead className="text-right">Margin %</TableHead>
                           <TableHead className="text-right">Komisi</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
@@ -939,8 +937,8 @@ export default function Dashboard() {
                           const profitMargin = agent.total_modal > 0 
                             ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
-                          // Komisi tahunan = total komisi dari tier komisi berdasarkan omset agen
-                          const yearlyAgentCommission = agent.total_commission || 0;
+                          // Komisi tahunan = Omset × 0.8% (bonus tahunan absolute)
+                          const yearlyAgentCommission = (agent.total_omset || 0) * 0.008;
                           return (
                             <TableRow 
                               key={agent.agent_id}
@@ -960,7 +958,6 @@ export default function Dashboard() {
                               </TableCell>
                               <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
                               <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
-                              <TableCell className="text-right text-green-600">{formatRupiah(agent.profit)}</TableCell>
                               <TableCell className="text-right text-emerald-600">{profitMargin.toFixed(1)}%</TableCell>
                               <TableCell className="text-right text-purple-600">{formatRupiah(yearlyAgentCommission)}</TableCell>
                               <TableCell>
