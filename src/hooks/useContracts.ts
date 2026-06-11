@@ -28,6 +28,7 @@ export interface ContractWithCustomer extends CreditContract {
     address: string | null;
     business_address: string | null;
     phone: string | null;
+    nik: string | null;
   } | null;
   sales_agents?: { name: string; agent_code: string } | null;
   collectors?: { name: string; collector_code: string } | null;
