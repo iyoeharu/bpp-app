@@ -331,7 +331,7 @@ export function DailyDueList({
             />
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-sm">
-                {filteredRows.length} batch
+                {groupedRows.length} pelanggan • {filteredRows.length} batch
               </Badge>
               <Badge variant="outline" className="text-sm">
                 {totalUnpaidCoupons} kupon • {formatRupiah(totalUnpaidAmount)}
