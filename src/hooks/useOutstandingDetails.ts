@@ -136,7 +136,7 @@ const fetchOutstandingDetails = async (
 export const useOutstandingDetailsMonthly = (month: Date = new Date()) => {
   const start = format(startOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['outstanding_details_monthly_v3', start],
+    queryKey: ['outstanding_details_monthly_v4', start],
     queryFn: () => fetchOutstandingDetails('monthly', month),
   });
 };
@@ -144,7 +144,7 @@ export const useOutstandingDetailsMonthly = (month: Date = new Date()) => {
 export const useOutstandingDetailsYearly = (year: Date = new Date()) => {
   const yr = year.getFullYear();
   return useQuery({
-    queryKey: ['outstanding_details_yearly_v3', yr],
+    queryKey: ['outstanding_details_yearly_v4', yr],
     queryFn: () => fetchOutstandingDetails('yearly', year),
   });
 };
