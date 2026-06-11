@@ -105,7 +105,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
   const yearEnd = format(endOfYear(year), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['yearly_financial_summary_contract', yearStart, yearEnd, statusFilter],
+    queryKey: ['yearly_financial_summary_contract_v2', yearStart, yearEnd, statusFilter],
     queryFn: async (): Promise<YearlyFinancialSummary> => {
       const [
         { data: agents, error: agentsError },
@@ -260,59 +260,48 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         });
       });
 
-      // TERTAGIH tahunan & per bulan — acuan: SUM Keuntungan Harian (payment_logs)
-      // TERTAGIH should only include payments for contracts that were created in the
-      // selected year (i.e. contracts list fetched above). Build a set of those
-      // contract IDs and only sum payments whose contract_id belongs to that set.
-      const contractIdsThisYear = new Set<string>((contracts || []).map((c: any) => c.id));
-
-      // Jumlahkan semua amount_paid dari payment_logs yang payment_date-nya di tahun ini
-      // dan alokasikan ke bulan berdasarkan payment_date (bukan start_date kontrak).
-      // Dengan demikian yearly `total_collected` akan sama dengan SUM dari setiap
-      // monthly breakdown `collected` (sinkron dengan card bulanan).
-      (payments || []).forEach((p: any) => {
-        if (!p.payment_date) return;
-        const amt = Number(p.amount_paid || 0);
-        const mk = format(new Date(p.payment_date), 'yyyy-MM');
+      // TERTAGIH bulanan — BASIS KONTRAK:
+      // Setiap pembayaran dialokasikan ke bulan start_date kontraknya (bukan payment_date).
+      // Hanya kontrak yang start_date-nya di tahun ini yang masuk (sudah di-filter di query).
+      const contractStartMonth = new Map<string, string>();
+      (contracts || []).forEach((c: any) => {
+        if (c.start_date) contractStartMonth.set(c.id, format(new Date(c.start_date), 'yyyy-MM'));
+      });
+      (allPayments || []).forEach((p: any) => {
+        const mk = contractStartMonth.get(p.contract_id);
+        if (!mk) return;
         const md = monthlyData.get(mk);
-        if (md) md.collected += amt;
+        if (md) md.collected += Number(p.amount_paid || 0);
       });
 
-      // KOMISI TAHUNAN: gunakan BONUS 0.8% saja (tanpa tiered commission untuk tahunan).
-      // Rumus: Total omset tahunan semua agen × 0.8%
-      // Catatan: Tier calculation hanya untuk bulanan. Tahunan HANYA menggunakan bonus 0.8%.
+      // KOMISI per bulan = tier komisi diterapkan pada total omset agen di bulan itu (sama dgn dashboard bulanan).
+      // KOMISI tahunan = SUM komisi bulanan (per agen) = jumlah dari card komisi tiap bulan.
       let totalCommission = 0;
-      const YEARLY_BONUS_PERCENTAGE = 0.8;
       const agentYearlyCommission = new Map<string, number>();
-      const agentCommissionPct = new Map<string, number>();
+      const agentCommissionPctSumWeighted = new Map<string, number>(); // utk tampilan % rata-rata tertimbang
 
-      agentYearlyOmset.forEach((omset, agentId) => {
-        // Tahunan: cukup gunakan bonus 0.8%, bukan tier calculation
-        const commission = (omset * YEARLY_BONUS_PERCENTAGE) / 100;
-        agentYearlyCommission.set(agentId, commission);
-        agentCommissionPct.set(agentId, YEARLY_BONUS_PERCENTAGE);
-        totalCommission += commission;
-      });
-
-      // Distribusi komisi ke breakdown bulanan secara proporsional terhadap omset bulan
-      // (untuk konsistensi tampilan monthly_breakdown), dan alokasi ke kontrak per share.
       months.forEach((monthDate) => {
         const monthKey = format(monthDate, 'yyyy-MM');
         const md = monthlyData.get(monthKey)!;
         let monthCommission = 0;
+        const detailMap = monthlyContractDetails.get(monthKey)!;
 
         monthlyAgentOmset.get(monthKey)?.forEach((agentMonthOmset, agentId) => {
-          if (agentMonthOmset > 0) {
-            const agentYear = agentYearlyOmset.get(agentId) || 0;
-            const agentYearComm = agentYearlyCommission.get(agentId) || 0;
-            const share = agentYear > 0 ? agentMonthOmset / agentYear : 0;
-            monthCommission += agentYearComm * share;
-          }
+          if (agentMonthOmset <= 0) return;
+          const pct = calculateTieredCommission(agentMonthOmset, tiers);
+          const comm = (agentMonthOmset * pct) / 100;
+          monthCommission += comm;
+          agentYearlyCommission.set(agentId, (agentYearlyCommission.get(agentId) || 0) + comm);
+          // weighted by omset → akumulasi pct*omset, nanti dibagi total omset agen
+          agentCommissionPctSumWeighted.set(
+            agentId,
+            (agentCommissionPctSumWeighted.get(agentId) || 0) + pct * agentMonthOmset,
+          );
         });
 
         md.commission = monthCommission;
+        totalCommission += monthCommission;
 
-        const detailMap = monthlyContractDetails.get(monthKey)!;
         if (md.total_omset > 0) {
           detailMap.forEach((d) => {
             const sh = d.omset / md.total_omset;
@@ -322,6 +311,13 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         }
         md.contracts_count = detailMap.size;
       });
+
+      const agentCommissionPct = new Map<string, number>();
+      agentYearlyOmset.forEach((omset, agentId) => {
+        const w = agentCommissionPctSumWeighted.get(agentId) || 0;
+        agentCommissionPct.set(agentId, omset > 0 ? w / omset : 0);
+      });
+
 
       // Process expenses by month
       (expenses || []).forEach((exp: any) => {

@@ -63,14 +63,14 @@ const fetchOutstandingDetails = async (
 
   const contractIds = (contracts || []).map((c: any) => c.id);
 
+  // Ambil SEMUA payment_logs untuk kontrak yg start di periode (tanpa filter payment_date)
+  // supaya konsisten dengan card "Tertagih" yang berbasis kontrak (bukan cash basis).
   let payments: any[] = [];
   if (contractIds.length > 0) {
     const { data: payData, error: pErr } = await supabase
       .from('payment_logs')
-      .select('contract_id, amount_paid, payment_date')
-      .in('contract_id', contractIds)
-      .gte('payment_date', start)
-      .lte('payment_date', end);
+      .select('contract_id, amount_paid')
+      .in('contract_id', contractIds);
     if (pErr) throw pErr;
     payments = payData || [];
   }
@@ -136,7 +136,7 @@ const fetchOutstandingDetails = async (
 export const useOutstandingDetailsMonthly = (month: Date = new Date()) => {
   const start = format(startOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['outstanding_details_monthly_v3', start],
+    queryKey: ['outstanding_details_monthly_v4', start],
     queryFn: () => fetchOutstandingDetails('monthly', month),
   });
 };
@@ -144,7 +144,7 @@ export const useOutstandingDetailsMonthly = (month: Date = new Date()) => {
 export const useOutstandingDetailsYearly = (year: Date = new Date()) => {
   const yr = year.getFullYear();
   return useQuery({
-    queryKey: ['outstanding_details_yearly_v3', yr],
+    queryKey: ['outstanding_details_yearly_v4', yr],
     queryFn: () => fetchOutstandingDetails('yearly', year),
   });
 };
