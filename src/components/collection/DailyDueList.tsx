@@ -478,24 +478,18 @@ export function DailyDueList({
                           {formatRupiah(totalAmount)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-1">
-                            {group.batches.map((b) => (
-                              <Button
-                                key={b.handover_id}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openDialog(b)}
-                                disabled={b.paid_count <= 0}
-                                className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
-                                title={`Batch ${b.start_index}-${b.end_index}`}
-                              >
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                {group.batches.length > 1
-                                  ? `${b.start_index}-${b.end_index}`
-                                  : "Belum Bayar"}
-                              </Button>
-                            ))}
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              openDialog(group.batches.filter((b) => b.paid_count > 0))
+                            }
+                            disabled={group.batches.every((b) => b.paid_count <= 0)}
+                            className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Belum Bayar
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
