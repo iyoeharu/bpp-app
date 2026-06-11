@@ -185,9 +185,10 @@ export default function Dashboard() {
     const profit = monthlyData?.total_profit ?? 0;
     const commission = monthlyData?.total_commission ?? 0;
     const collector = opCollectorSalaryTotal || collectorSalaryTotal || 0;
+    const staff = opStaffSalaryTotal || 0;
     const opsExcl = operationalExclSalaries || 0;
-    return profit - commission - opsExcl - collector;
-  }, [monthlyData?.total_profit, monthlyData?.total_commission, opCollectorSalaryTotal, collectorSalaryTotal, operationalExclSalaries]);
+    return profit - commission - opsExcl - collector - staff;
+  }, [monthlyData?.total_profit, monthlyData?.total_commission, opCollectorSalaryTotal, collectorSalaryTotal, opStaffSalaryTotal, operationalExclSalaries]);
 
   // Margin keuntungan kotor: (omset - modal) / modal * 100
   const grossProfitMargin = useMemo(() => {
