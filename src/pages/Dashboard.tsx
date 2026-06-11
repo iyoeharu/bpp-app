@@ -380,8 +380,8 @@ export default function Dashboard() {
           value={operationalExclSalaries}
           valueColor="text-orange-600"
           isNegative
-          subtitle="Pengeluaran bulan ini (tidak termasuk gaji kolektor)"
-          hoverInfo="Total biaya operasional selain gaji kolektor (transport, komunikasi, dll)."
+          subtitle="Pengeluaran bulan ini (tidak termasuk gaji karyawan & kolektor)"
+          hoverInfo="Total biaya operasional selain gaji kolektor dan gaji karyawan (transport, komunikasi, dll)."
         />
 
         <StatCard
