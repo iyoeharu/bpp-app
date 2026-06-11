@@ -802,11 +802,11 @@ export default function Dashboard() {
                   icon={Users}
                   iconColor="text-cyan-500"
                   label="Gaji Karyawan"
-                  value={yearlyOpStaffSalaryTotal}
+                  value={(yearlyOpStaffSalaryTotal || 0) + (yearlyOpCollectorSalaryTotal || collectorSalaryTotalYearly || 0)}
                   valueColor="text-cyan-600"
                   isNegative
-                  subtitle={`Total gaji karyawan tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo="Total gaji karyawan (per posisi) sepanjang tahun. Dipisahkan dari biaya operasional dan diinput pada halaman Gaji Karyawan."
+                  subtitle={`Total gaji karyawan + kolektor tahun ${selectedYear.getFullYear()}`}
+                  hoverInfo={`Total gaji karyawan & kolektor tahun ${selectedYear.getFullYear()}.\nKaryawan: ${formatRupiah(yearlyOpStaffSalaryTotal || 0)}\nKolektor: ${formatRupiah(yearlyOpCollectorSalaryTotal || collectorSalaryTotalYearly || 0)}`}
                 />
 
                 <StatCard
