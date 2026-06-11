@@ -110,92 +110,128 @@ export default function CustomerHistory() {
   const { data: payments, isLoading: loadingPayments } = usePaymentsByContract(
     selectedContractId
   );
+  const { data: handovers, isLoading: loadingHandovers } = useHandoversByContract(
+    selectedContractId || null
+  );
 
   // Pagination constants
   const ITEMS_PER_PAGE = 5;
-  
-  // Group bulk payments (same payment_date + notes + collector, consecutive installments) into one row
-  const groupedPayments = useMemo(() => {
-    if (!payments) return [] as Array<{
-      id: string;
-      payment_date: string;
-      collectors: { name: string; collector_code: string } | null;
-      notes: string | null;
-      start_index: number;
-      end_index: number;
-      total_amount: number;
-      count: number;
-    }>;
-    // Extract a batch signature from a note. Bulk inserts (legacy + new) share
-    // a common range marker that we use as the grouping key.
-    //   - new format: "Kupon yang dibayar adalah 18 - 21"
-    //   - legacy:    "Pembayaran kupon 20 (batch 18-21)"
-    const batchKey = (note: string | null): string | null => {
-      if (!note) return null;
-      const m1 = note.match(/adalah\s+(\d+)\s*-\s*(\d+)/i);
-      if (m1) return `${m1[1]}-${m1[2]}`;
-      const m2 = note.match(/batch\s+(\d+)\s*-\s*(\d+)/i);
-      if (m2) return `${m2[1]}-${m2[2]}`;
-      return null;
-    };
-    const sorted = [...payments].sort((a, b) => {
-      if (a.payment_date !== b.payment_date) return a.payment_date < b.payment_date ? 1 : -1;
-      return a.installment_index - b.installment_index;
-    });
-    const groups: Array<{
-      id: string;
-      payment_date: string;
-      collectors: { name: string; collector_code: string } | null;
-      notes: string | null;
-      start_index: number;
-      end_index: number;
-      total_amount: number;
-      count: number;
-      _batch: string | null;
-    }> = [];
-    for (const p of sorted) {
-      const last = groups[groups.length - 1];
-      const pBatch = batchKey(p.notes);
-      const sameGroup =
-        last &&
-        last.payment_date === p.payment_date &&
-        (last.collectors?.name || '') === (p.collectors?.name || '') &&
-        p.installment_index === last.end_index + 1 &&
-        // Merge when both rows belong to the same batch range, OR when neither
-        // has a batch marker and their notes match (single sequential entries).
-        ((pBatch !== null && pBatch === last._batch) ||
-          (pBatch === null && last._batch === null && (last.notes || '') === (p.notes || '')));
-      if (sameGroup) {
-        last.end_index = p.installment_index;
-        last.total_amount += Number(p.amount_paid);
-        last.count += 1;
-      } else {
-        groups.push({
-          id: p.id,
-          payment_date: p.payment_date,
-          collectors: p.collectors,
-          notes: p.notes,
-          start_index: p.installment_index,
-          end_index: p.installment_index,
-          total_amount: Number(p.amount_paid),
-          count: 1,
-          _batch: pBatch,
+
+  // Build payment history rows from coupon_handovers (sumber serah terima).
+  // Setiap handover = 1 baris dengan KB (kupon bawa) & KP (kupon pulang/belum bayar).
+  type HistoryRow = {
+    id: string;
+    payment_date: string;
+    collectors: { name: string; collector_code: string } | null;
+    notes: string | null;
+    start_index: number;
+    end_index: number;
+    kb: number;      // kupon bawa (diserahkan)
+    kp: number;      // kupon pulang (tidak terbayar)
+    paid_count: number;
+    total_amount: number;
+  };
+
+  const historyRows = useMemo<HistoryRow[]>(() => {
+    const rows: HistoryRow[] = [];
+    const paidIndicesInHandover = new Set<number>();
+
+    // Index payments by installment_index for quick lookup
+    const paymentsByIdx = new Map<number, { amount: number }>();
+    for (const p of payments || []) {
+      paymentsByIdx.set(p.installment_index, { amount: Number(p.amount_paid) });
+    }
+
+    for (const h of handovers || []) {
+      let paid = 0;
+      let total = 0;
+      for (let i = h.start_index; i <= h.end_index; i++) {
+        const pay = paymentsByIdx.get(i);
+        if (pay) {
+          paid += 1;
+          total += pay.amount;
+          paidIndicesInHandover.add(i);
+        }
+      }
+      const kb = h.coupon_count;
+      const kp = Math.max(0, kb - paid);
+      rows.push({
+        id: h.id,
+        payment_date: h.handover_date,
+        collectors: h.collectors || null,
+        notes: h.notes,
+        start_index: h.start_index,
+        end_index: h.end_index,
+        kb,
+        kp,
+        paid_count: paid,
+        total_amount: total,
+      });
+    }
+
+    // Legacy fallback: pembayaran yang TIDAK terhubung ke handover apapun.
+    // Tampilkan sebagai baris terpisah agar histori tetap lengkap.
+    const orphanPayments = (payments || []).filter(
+      (p) => !paidIndicesInHandover.has(p.installment_index)
+    );
+    if (orphanPayments.length > 0) {
+      // Group berdasarkan tgl + kolektor + indeks konsekutif
+      const sorted = [...orphanPayments].sort((a, b) => {
+        if (a.payment_date !== b.payment_date) return a.payment_date < b.payment_date ? 1 : -1;
+        return a.installment_index - b.installment_index;
+      });
+      type G = { id: string; payment_date: string; collectors: { name: string; collector_code: string } | null; notes: string | null; start_index: number; end_index: number; total_amount: number; count: number };
+      const groups: G[] = [];
+      for (const p of sorted) {
+        const last = groups[groups.length - 1];
+        const same = last
+          && last.payment_date === p.payment_date
+          && (last.collectors?.name || '') === (p.collectors?.name || '')
+          && p.installment_index === last.end_index + 1;
+        if (same) {
+          last.end_index = p.installment_index;
+          last.total_amount += Number(p.amount_paid);
+          last.count += 1;
+        } else {
+          groups.push({
+            id: p.id,
+            payment_date: p.payment_date,
+            collectors: p.collectors,
+            notes: p.notes,
+            start_index: p.installment_index,
+            end_index: p.installment_index,
+            total_amount: Number(p.amount_paid),
+            count: 1,
+          });
+        }
+      }
+      for (const g of groups) {
+        rows.push({
+          id: g.id,
+          payment_date: g.payment_date,
+          collectors: g.collectors,
+          notes: g.notes,
+          start_index: g.start_index,
+          end_index: g.end_index,
+          kb: g.count,
+          kp: 0,
+          paid_count: g.count,
+          total_amount: g.total_amount,
         });
       }
     }
-    // For grouped (count > 1) rows, normalize the displayed note to the
-    // canonical range format so legacy per-coupon notes do not leak through.
-    return groups.map((g) => ({
-      ...g,
-      notes:
-        g.count > 1
-          ? `Kupon yang dibayar adalah ${g.start_index} - ${g.end_index}`
-          : g.notes,
-    }));
-  }, [payments]);
+
+    // Sort desc by tanggal lalu start_index desc
+    rows.sort((a, b) => {
+      if (a.payment_date !== b.payment_date) return a.payment_date < b.payment_date ? 1 : -1;
+      return b.start_index - a.start_index;
+    });
+
+    return rows;
+  }, [handovers, payments]);
 
   // Add pagination for grouped payments
-  const { currentPage, totalPages, paginatedItems: paginatedPayments, goToPage, totalItems } = usePagination(groupedPayments, ITEMS_PER_PAGE);
+  const { currentPage, totalPages, paginatedItems: paginatedPayments, goToPage, totalItems } = usePagination(historyRows, ITEMS_PER_PAGE);
 
   // Add pagination for customer list
   const { 
