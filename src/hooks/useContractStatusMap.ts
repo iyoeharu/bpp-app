@@ -30,8 +30,9 @@ async function fetchAll<T>(
 
 /**
  * Membuat Map status real-time untuk setiap kontrak.
- * Keterlambatan = jumlah kupon yang belum dibayar dengan due_date < hari ini.
- * Tanggal lunas = tanggal pembayaran terakhir (payment_date terbesar).
+ * lateDays = jumlah HARI KERJA (skip Minggu + holiday) dari due_date kupon
+ * terakhir yang dibayar (exclusive) sampai hari ini (inclusive).
+ * Untuk kontrak yang belum pernah bayar: dihitung dari created_at.
  */
 export const useContractStatusMap = () => {
   return useQuery({
@@ -42,7 +43,7 @@ export const useContractStatusMap = () => {
       today.setHours(0, 0, 0, 0);
       const todayStr = today.toISOString().split('T')[0];
 
-      // 1. Semua kupon unpaid (contract_id, due_date)
+      // Kupon unpaid (total + overdue)
       const unpaid = await fetchAll<{ contract_id: string; due_date: string }>(
         () =>
           supabase
@@ -52,9 +53,7 @@ export const useContractStatusMap = () => {
             .order('contract_id')
       );
 
-      // 2. Tanggal kupon terakhir yang sudah dibayar (berdasarkan due_date kupon paid)
-      //    Gap "macet" dihitung dari due_date kupon terakhir yang telah dibayar,
-      //    BUKAN dari tanggal input payment_log.
+      // Kupon paid (untuk cari due_date terakhir yang dibayar)
       const paidCoupons = await fetchAll<{ contract_id: string; due_date: string }>(
         () =>
           supabase
@@ -63,7 +62,8 @@ export const useContractStatusMap = () => {
             .eq('status', 'paid')
             .order('due_date', { ascending: false })
       );
-      // Untuk Tgl Lunas: tetap ambil payment_date terakhir dari payment_logs
+
+      // Payment logs (Tgl Lunas)
       const payments = await fetchAll<{ contract_id: string; payment_date: string }>(
         () =>
           supabase
@@ -72,28 +72,58 @@ export const useContractStatusMap = () => {
             .order('payment_date', { ascending: false })
       );
 
-      // 3. Status kontrak (untuk completed flag)
-      const contracts = await fetchAll<{ id: string; status: string }>(
+      // Kontrak
+      const contracts = await fetchAll<{ id: string; status: string; created_at?: string }>(
         () => supabase.from('credit_contracts').select('id, status, created_at')
       );
 
+      // Holidays
+      const { data: holidaysData } = await supabase
+        .from('holidays')
+        .select('holiday_date, holiday_type, day_of_week');
+      const holidayDates = new Set<string>();
+      const recurringWeekdays = new Set<number>([0]); // Minggu default libur
+      for (const h of (holidaysData ?? []) as Array<{ holiday_date: string | null; holiday_type: string; day_of_week: number | null }>) {
+        if (h.holiday_type === 'specific_date' && h.holiday_date) holidayDates.add(h.holiday_date);
+        else if (h.holiday_type === 'recurring_weekday' && h.day_of_week != null) recurringWeekdays.add(h.day_of_week);
+      }
+
+      const isWorkingDay = (d: Date) => {
+        if (recurringWeekdays.has(d.getDay())) return false;
+        const iso = d.toISOString().split('T')[0];
+        if (holidayDates.has(iso)) return false;
+        return true;
+      };
+
+      // Hitung hari kerja antara from (exclusive) sampai today (inclusive)
+      const countWorkingDays = (fromIso: string): number => {
+        const from = new Date(fromIso);
+        from.setHours(0, 0, 0, 0);
+        let count = 0;
+        const cur = new Date(from);
+        cur.setDate(cur.getDate() + 1); // exclusive dari fromIso
+        while (cur.getTime() <= today.getTime()) {
+          if (isWorkingDay(cur)) count++;
+          cur.setDate(cur.getDate() + 1);
+        }
+        return count;
+      };
+
       // Agregasi
-      const unpaidByContract = new Map<string, { lateDays: number; unpaidCount: number }>();
+      const unpaidByContract = new Map<string, { overdueCount: number; unpaidCount: number }>();
       for (const c of unpaid) {
-        const prev = unpaidByContract.get(c.contract_id) ?? { lateDays: 0, unpaidCount: 0 };
+        const prev = unpaidByContract.get(c.contract_id) ?? { overdueCount: 0, unpaidCount: 0 };
         prev.unpaidCount += 1;
-        // Kupon overdue = due_date sudah lewat (sebelum hari ini)
-        if (c.due_date < todayStr) prev.lateDays += 1;
+        if (c.due_date < todayStr) prev.overdueCount += 1;
         unpaidByContract.set(c.contract_id, prev);
       }
 
-      // Map: due_date kupon paid terakhir (dipakai utk hitung gap macet)
       const lastPaidDueByContract = new Map<string, string>();
       for (const c of paidCoupons) {
         const cur = lastPaidDueByContract.get(c.contract_id);
         if (!cur || c.due_date > cur) lastPaidDueByContract.set(c.contract_id, c.due_date);
       }
-      // Map: payment_date terakhir (dipakai utk Tgl Lunas)
+
       const lastPaymentByContract = new Map<string, string>();
       for (const p of payments) {
         if (!lastPaymentByContract.has(p.contract_id)) {
@@ -102,32 +132,36 @@ export const useContractStatusMap = () => {
       }
 
       const map = new Map<string, ContractStatusInfo>();
-      for (const ct of contracts as Array<{ id: string; status: string; created_at?: string }>) {
-        const unpaidInfo = unpaidByContract.get(ct.id) ?? { lateDays: 0, unpaidCount: 0 };
+      for (const ct of contracts) {
+        const unpaidInfo = unpaidByContract.get(ct.id) ?? { overdueCount: 0, unpaidCount: 0 };
         const lastPay = lastPaymentByContract.get(ct.id) ?? null;
         const lastPaidDue = lastPaidDueByContract.get(ct.id) ?? null;
         const isCompleted = ct.status === 'completed' || unpaidInfo.unpaidCount === 0;
-        // Hari sejak due_date kupon terakhir yang sudah dibayar (untuk rule >20 hari -> macet)
+
+        // Realtime lateDays: hitung hari kerja sejak due_date kupon paid terakhir
+        // (atau created_at jika belum pernah bayar) sampai hari ini.
+        // Cap dengan jumlah kupon overdue yang ada agar tidak overcount.
+        let lateDays = 0;
         let daysSinceLastPayment = 0;
-        if (lastPaidDue) {
-          const last = new Date(lastPaidDue);
-          last.setHours(0, 0, 0, 0);
-          daysSinceLastPayment = Math.max(
-            0,
-            Math.floor((today.getTime() - last.getTime()) / 86400000)
-          );
+        if (!isCompleted) {
+          const baseline = lastPaidDue ?? (ct.created_at ? ct.created_at.split('T')[0] : null);
+          if (baseline) {
+            const working = countWorkingDays(baseline);
+            lateDays = Math.min(working, unpaidInfo.overdueCount);
+            daysSinceLastPayment = working;
+          }
         }
+
         const status = determineContractStatus({
           status: isCompleted ? 'completed' : ct.status,
-          lateDays: unpaidInfo.lateDays,
+          lateDays,
           daysSinceLastPayment,
-          // PENTING: tanpa createdAt, aturan "belum pernah bayar & kontrak ≥ 6 hari → Macet"
-          // tidak akan trigger untuk kontrak baru yang belum ada payment_logs.
           createdAt: ct.created_at,
         });
+
         map.set(ct.id, {
           status,
-          lateDays: unpaidInfo.lateDays,
+          lateDays,
           unpaidCount: unpaidInfo.unpaidCount,
           lastPaymentDate: lastPay,
           completedDate: isCompleted ? lastPay : null,
