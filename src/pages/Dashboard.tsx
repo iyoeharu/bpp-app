@@ -416,8 +416,8 @@ export default function Dashboard() {
           value={macetSummary?.total_outstanding ?? 0}
           valueColor="text-rose-600"
           isNegative
-          subtitle={`${macetSummary?.macet_count ?? 0} kontrak macet bulan ini`}
-          hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat bulan ini.\nJumlah kontrak: ${macetSummary?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummary?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummary?.total_outstanding ?? 0)}`}
+          subtitle={`${macetSummary?.macet_count ?? 0} kontrak macet (real-time)`}
+          hoverInfo={`Kontrak aktif berstatus MACET (acuan: Riwayat Pelanggan / useContractStatusMap).\nJumlah kontrak: ${macetSummary?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummary?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummary?.total_outstanding ?? 0)}`}
           onDetailClick={() => { setMacetDetailScope('monthly'); setMacetDetailOpen(true); }}
         />
       </div>
@@ -822,8 +822,8 @@ export default function Dashboard() {
                   value={macetSummaryYearly?.total_outstanding ?? 0}
                   valueColor="text-rose-600"
                   isNegative
-                  subtitle={`${macetSummaryYearly?.macet_count ?? 0} kontrak macet tahun ${selectedYear.getFullYear()}`}
-                  hoverInfo={`Kontrak aktif berstatus MACET (telat pembayaran parah) dari kontrak yang dibuat tahun ${selectedYear.getFullYear()}.\nJumlah kontrak: ${macetSummaryYearly?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummaryYearly?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummaryYearly?.total_outstanding ?? 0)}`}
+                  subtitle={`${macetSummaryYearly?.macet_count ?? 0} kontrak macet (real-time)`}
+                  hoverInfo={`Kontrak aktif berstatus MACET (acuan: Riwayat Pelanggan / useContractStatusMap).\nJumlah kontrak: ${macetSummaryYearly?.macet_count ?? 0}\nModal nyangkut: ${formatRupiah(macetSummaryYearly?.total_modal_at_risk ?? 0)}\nSisa tagihan macet: ${formatRupiah(macetSummaryYearly?.total_outstanding ?? 0)}`}
                   onDetailClick={() => { setMacetDetailScope('yearly'); setMacetDetailOpen(true); }}
                 />
 

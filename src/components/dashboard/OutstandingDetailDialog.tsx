@@ -1,10 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { formatRupiah } from "@/lib/format";
 import type { OutstandingDetailsSummary } from "@/hooks/useOutstandingDetails";
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
 
 interface Props {
   open: boolean;
@@ -82,60 +79,6 @@ export function OutstandingDetailDialog({ open, onOpenChange, title, data }: Pro
                           <TableCell className="text-right">{formatRupiah(s.total_contract)}</TableCell>
                           <TableCell className="text-right text-green-600">{formatRupiah(s.total_paid)}</TableCell>
                           <TableCell className="text-right text-destructive font-semibold">{formatRupiah(s.total_outstanding)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-
-          {/* Detail per Kontrak */}
-          <div>
-            <h3 className="text-sm font-semibold mb-2">Detail Kontrak (urut sisa terbesar)</h3>
-            <div className="rounded-md border">
-              <div className="max-h-[400px] overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead>Tanggal Mulai</TableHead>
-                      <TableHead>No. Kontrak</TableHead>
-                      <TableHead>Pelanggan</TableHead>
-                      <TableHead>Sales</TableHead>
-                       <TableHead className="text-right">Nilai Kontrak</TableHead>
-                       <TableHead className="text-right">Dibayar</TableHead>
-                      <TableHead className="text-right">Sisa</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(data?.contracts || []).length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
-                          Tidak ada sisa tagihan
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      data!.contracts.map((c) => (
-                        <TableRow key={c.contract_id}>
-                          <TableCell className="whitespace-nowrap">
-                            {format(new Date(c.start_date), 'dd MMM yyyy', { locale: idLocale })}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{c.contract_ref}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{c.customer_name}</div>
-                            {c.customer_phone && (
-                              <div className="text-xs text-muted-foreground">{c.customer_phone}</div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {c.sales_code !== '-' ? `${c.sales_code} · ` : ''}{c.sales_name}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{formatRupiah(c.contract_total)}</TableCell>
-                          <TableCell className="text-right text-green-600">{formatRupiah(c.paid_amount)}</TableCell>
-                          <TableCell className="text-right text-destructive font-semibold">{formatRupiah(c.outstanding)}</TableCell>
                         </TableRow>
                       ))
                     )}

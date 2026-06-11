@@ -1,16 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { determineContractStatus, calculateDaysSinceLastPayment } from '@/lib/statusCalculation';
+import { determineContractStatus } from '@/lib/statusCalculation';
 
 /**
- * Ringkasan kontrak MACET (status dinamis) — bukan returned.
- * Macet = kontrak masih aktif tapi telat parah berdasarkan rasio hari/angsuran.
+ * Ringkasan kontrak MACET (status real-time).
+ *
+ * ACUAN: identik dengan halaman Riwayat Pelanggan (useContractStatusMap).
+ *   lateDays            = jumlah kupon unpaid yg due_date < hari ini
+ *   daysSinceLastPayment = hari sejak due_date kupon PAID terakhir
+ *   status              = determineContractStatus({...})
+ * Kontrak dianggap MACET bila status === 'macet'.
+ *
+ * Card "Macet" di Dashboard (bulanan & tahunan) memakai data GLOBAL — tidak
+ * difilter oleh periode start_date, supaya sinkron dengan tampilan Riwayat
+ * Pelanggan yang menampilkan semua kontrak macet aktif.
  */
 export interface MacetSummary {
   macet_count: number;
-  total_outstanding: number; // sisa tagihan dari kontrak macet
-  total_modal_at_risk: number; // modal yang masih nyangkut di kontrak macet
+  total_outstanding: number;
+  total_modal_at_risk: number;
   contracts: MacetContractDetail[];
   by_sales: MacetBySales[];
 }
@@ -39,73 +48,79 @@ export interface MacetBySales {
   total_outstanding: number;
 }
 
-const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSummary> => {
+const PAGE_SIZE = 1000;
+async function fetchAll<T>(builder: () => any): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
+const fetchMacetGlobal = async (): Promise<MacetSummary> => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  // 1. Semua kontrak aktif (bukan returned)
   const { data: contracts, error } = await supabase
     .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, daily_installment_amount, tenor_days, start_date, status, current_installment_index, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)')
-    .neq('status', 'returned')
-    .neq('status', 'completed')
-    .gte('start_date', rangeStart)
-    .lte('start_date', rangeEnd);
+    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)')
+    .neq('status', 'returned');
   if (error) throw error;
 
-  const allIds = (contracts || []).map((c: any) => c.id);
+  // 2. Semua kupon unpaid (utk lateDays & unpaidCount)
+  const unpaid = await fetchAll<{ contract_id: string; due_date: string }>(() =>
+    supabase.from('installment_coupons').select('contract_id, due_date').eq('status', 'unpaid').order('contract_id'),
+  );
+  // 3. Kupon PAID (utk gap macet — pakai due_date kupon terakhir yg dibayar)
+  const paidCoupons = await fetchAll<{ contract_id: string; due_date: string }>(() =>
+    supabase.from('installment_coupons').select('contract_id, due_date').eq('status', 'paid').order('due_date', { ascending: false }),
+  );
 
-  // Real-time: ambil SEMUA kupon unpaid (untuk hitung jumlah overdue) & last payment per kontrak.
-  // Logika ini disinkronkan dengan useContractStatusMap (Riwayat Pelanggan) supaya status MACET
-  // di Dashboard identik dengan status di halaman Riwayat Pelanggan.
-  const [{ data: unpaidCoupons, error: cErr }, { data: lastPays, error: lpErr }] = await Promise.all([
-    allIds.length
-      ? supabase
-          .from('installment_coupons')
-          .select('contract_id, due_date')
-          .eq('status', 'unpaid')
-          .in('contract_id', allIds)
-      : Promise.resolve({ data: [], error: null } as any),
-    allIds.length
-      ? supabase
-          .from('payment_logs')
-          .select('contract_id, payment_date')
-          .in('contract_id', allIds)
-          .order('payment_date', { ascending: false })
-      : Promise.resolve({ data: [], error: null } as any),
-  ]);
-  if (cErr) throw cErr;
-  if (lpErr) throw lpErr;
-
-  // lateDays = jumlah kupon unpaid yg due_date sudah lewat (identik dgn useContractStatusMap)
-  const todayStr = new Date().toISOString().split('T')[0];
   const overdueCountByContract = new Map<string, number>();
   const unpaidCountByContract = new Map<string, number>();
-  (unpaidCoupons || []).forEach((c: any) => {
+  for (const c of unpaid) {
     unpaidCountByContract.set(c.contract_id, (unpaidCountByContract.get(c.contract_id) || 0) + 1);
     if (c.due_date < todayStr) {
       overdueCountByContract.set(c.contract_id, (overdueCountByContract.get(c.contract_id) || 0) + 1);
     }
-  });
+  }
+  const lastPaidDueByContract = new Map<string, string>();
+  for (const c of paidCoupons) {
+    const cur = lastPaidDueByContract.get(c.contract_id);
+    if (!cur || c.due_date > cur) lastPaidDueByContract.set(c.contract_id, c.due_date);
+  }
 
-  const lastPaymentByContract = new Map<string, string>();
-  (lastPays || []).forEach((p: any) => {
-    if (!lastPaymentByContract.has(p.contract_id)) {
-      lastPaymentByContract.set(p.contract_id, p.payment_date);
-    }
-  });
-
-  // Hanya kontrak yang benar-benar MACET berdasarkan determineContractStatus
+  // 4. Filter macet pakai aturan yang sama dgn useContractStatusMap
   const macetContracts = (contracts || []).filter((c: any) => {
     const lateDays = overdueCountByContract.get(c.id) || 0;
     const unpaidCount = unpaidCountByContract.get(c.id) || 0;
-    const daysSinceLastPayment = calculateDaysSinceLastPayment(lastPaymentByContract.get(c.id));
     const isCompleted = c.status === 'completed' || unpaidCount === 0;
+    const lastPaidDue = lastPaidDueByContract.get(c.id);
+    let daysSinceLastPayment = 0;
+    if (lastPaidDue) {
+      const last = new Date(lastPaidDue);
+      last.setHours(0, 0, 0, 0);
+      daysSinceLastPayment = Math.max(0, Math.floor((today.getTime() - last.getTime()) / 86400000));
+    }
     const status = determineContractStatus({
       status: isCompleted ? 'completed' : c.status,
       lateDays,
       daysSinceLastPayment,
+      createdAt: c.created_at,
     });
     return status === 'macet';
   });
-  const ids = macetContracts.map((c: any) => c.id);
 
+  // 5. Total dibayar per kontrak (utk outstanding nominal)
+  const ids = macetContracts.map((c: any) => c.id);
   const paidMap = new Map<string, number>();
   if (ids.length > 0) {
     const { data: payments, error: pErr } = await supabase
@@ -123,7 +138,6 @@ const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSu
   const detailList: MacetContractDetail[] = [];
   const salesAgg = new Map<string, MacetBySales>();
   macetContracts.forEach((c: any) => {
-    // Sinkron dengan rumus sisa tagihan di hook lain
     const contractTotal = Number(c.total_loan_amount || 0);
     const paid = paidMap.get(c.id) || 0;
     const outstanding = Math.max(0, contractTotal - paid);
@@ -167,12 +181,17 @@ const fetchMacet = async (rangeStart: string, rangeEnd: string): Promise<MacetSu
   };
 };
 
+/**
+ * Macet GLOBAL — sinkron dgn Riwayat Pelanggan. Tidak difilter periode.
+ * Signature `month`/`year` dipertahankan utk kompat, tapi diabaikan dlm hasil
+ * (cuma dipakai utk cache key per periode agar refetch tetap teratur).
+ */
 export const useMacetSummary = (month: Date = new Date()) => {
   const s = format(startOfMonth(month), 'yyyy-MM-dd');
   const e = format(endOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary', s, e],
-    queryFn: () => fetchMacet(s, e),
+    queryKey: ['macet_summary_global', s, e],
+    queryFn: fetchMacetGlobal,
   });
 };
 
@@ -180,150 +199,17 @@ export const useMacetSummaryYearly = (year: Date = new Date()) => {
   const s = format(startOfYear(year), 'yyyy-MM-dd');
   const e = format(endOfYear(year), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary_yearly', s, e],
-    queryFn: () => fetchMacet(s, e),
+    queryKey: ['macet_summary_global_yearly', s, e],
+    queryFn: fetchMacetGlobal,
   });
-};
-
-/**
- * REAL-TIME MACET SUMMARY
- * Query kontrak yang dibuat di bulan itu, tapi hitung status REAL-TIME (hari ini).
- * Ini untuk Dashboard yang ingin menampilkan kontrak yg awalnya macet tapi sudah bayar.
- */
-const fetchMacetRealTime = async (rangeStart: string, rangeEnd: string): Promise<MacetSummary> => {
-  // Query kontrak yang DIBUAT di range (not based on payment date)
-  const { data: contracts, error } = await supabase
-    .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, daily_installment_amount, tenor_days, start_date, status, current_installment_index, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)')
-    .neq('status', 'returned')
-    .neq('status', 'completed')
-    .gte('start_date', rangeStart)
-    .lte('start_date', rangeEnd);
-  if (error) throw error;
-
-  const allIds = (contracts || []).map((c: any) => c.id);
-
-  // Real-time: ambil kupon unpaid (earliest due_date) & last payment per kontrak (TODAY's status)
-  const [{ data: unpaidCoupons, error: cErr }, { data: lastPays, error: lpErr }] = await Promise.all([
-    allIds.length
-      ? supabase
-          .from('installment_coupons')
-          .select('contract_id, due_date')
-          .eq('status', 'unpaid')
-          .in('contract_id', allIds)
-      : Promise.resolve({ data: [], error: null } as any),
-    allIds.length
-      ? supabase
-          .from('payment_logs')
-          .select('contract_id, payment_date')
-          .in('contract_id', allIds)
-          .order('payment_date', { ascending: false })
-      : Promise.resolve({ data: [], error: null } as any),
-  ]);
-  if (cErr) throw cErr;
-  if (lpErr) throw lpErr;
-
-  // lateDays = jumlah kupon unpaid yg due_date sudah lewat (identik dgn useContractStatusMap)
-  const todayStrRT = new Date().toISOString().split('T')[0];
-  const overdueCountRT = new Map<string, number>();
-  const unpaidCountRT = new Map<string, number>();
-  (unpaidCoupons || []).forEach((c: any) => {
-    unpaidCountRT.set(c.contract_id, (unpaidCountRT.get(c.contract_id) || 0) + 1);
-    if (c.due_date < todayStrRT) {
-      overdueCountRT.set(c.contract_id, (overdueCountRT.get(c.contract_id) || 0) + 1);
-    }
-  });
-
-  const lastPaymentByContract = new Map<string, string>();
-  (lastPays || []).forEach((p: any) => {
-    if (!lastPaymentByContract.has(p.contract_id)) {
-      lastPaymentByContract.set(p.contract_id, p.payment_date);
-    }
-  });
-
-  // Filter REAL-TIME status = macet (status terkini hari ini, bukan saat dibuat)
-  const macetContracts = (contracts || []).filter((c: any) => {
-    const lateDays = overdueCountRT.get(c.id) || 0;
-    const unpaidCount = unpaidCountRT.get(c.id) || 0;
-    const daysSinceLastPayment = calculateDaysSinceLastPayment(lastPaymentByContract.get(c.id));
-    const isCompleted = c.status === 'completed' || unpaidCount === 0;
-    const status = determineContractStatus({
-      status: isCompleted ? 'completed' : c.status,
-      lateDays,
-      daysSinceLastPayment,
-    });
-    return status === 'macet';  // ← REAL-TIME status
-  });
-  const ids = macetContracts.map((c: any) => c.id);
-
-  let total_outstanding = 0;
-  let total_modal_at_risk = 0;
-  const paidMap = new Map<string, number>();
-  if (ids.length > 0) {
-    const { data: payments, error: pErr } = await supabase
-      .from('payment_logs')
-      .select('contract_id, amount_paid')
-      .in('contract_id', ids);
-    if (pErr) throw pErr;
-    (payments || []).forEach((p: any) => {
-      paidMap.set(p.contract_id, (paidMap.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
-    });
-  }
-
-  const detailList: MacetContractDetail[] = [];
-  const salesAgg = new Map<string, MacetBySales>();
-  macetContracts.forEach((c: any) => {
-    const paid = paidMap.get(c.id) || 0;
-    const outstanding = (c.omset || 0) - paid;
-    total_outstanding += outstanding;
-    total_modal_at_risk += c.total_loan_amount || 0;
-
-    const detail: MacetContractDetail = {
-      id: c.id,
-      contract_ref: c.contract_ref,
-      start_date: c.start_date,
-      customer_name: c.customers?.name || null,
-      customer_phone: c.customers?.phone || null,
-      sales_id: c.sales_agent_id,
-      sales_name: c.sales_agents?.name || '(Unknown)',
-      sales_code: c.sales_agents?.agent_code || null,
-      modal: c.total_loan_amount || 0,
-      contract_total: c.omset || 0,
-      paid,
-      outstanding,
-    };
-    detailList.push(detail);
-
-    const key = `${c.sales_agent_id}|${c.sales_agents?.name || '(Unknown)'}|${c.sales_agents?.agent_code || ''}`;
-    const cur = salesAgg.get(key) || {
-      sales_id: c.sales_agent_id,
-      sales_name: c.sales_agents?.name || '(Unknown)',
-      sales_code: c.sales_agents?.agent_code || null,
-      contract_count: 0,
-      total_modal: 0,
-      total_outstanding: 0,
-    };
-    cur.contract_count += 1;
-    cur.total_modal += c.total_loan_amount || 0;
-    cur.total_outstanding += outstanding;
-    salesAgg.set(key, cur);
-  });
-
-  return {
-    macet_count: macetContracts.length,
-    total_outstanding,
-    total_modal_at_risk,
-    contracts: detailList.sort((a, b) => b.outstanding - a.outstanding),
-    by_sales: Array.from(salesAgg.values()).sort((a, b) => b.total_outstanding - a.total_outstanding),
-  };
 };
 
 export const useMacetSummaryRealTime = (month: Date = new Date()) => {
   const s = format(startOfMonth(month), 'yyyy-MM-dd');
   const e = format(endOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary_realtime', s, e],
-    queryFn: () => fetchMacetRealTime(s, e),
-    refetchInterval: 30000, // Update setiap 30 detik untuk real-time
+    queryKey: ['macet_summary_global_rt', s, e],
+    queryFn: fetchMacetGlobal,
+    refetchInterval: 30000,
   });
 };
