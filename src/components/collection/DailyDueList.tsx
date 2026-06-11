@@ -292,13 +292,21 @@ export function DailyDueList({
       );
   };
 
-  // Submit dari modal "Belum Bayar" (manual)
+  // Submit dari modal "Belum Bayar" — distribusi rollback ke batch dari yang terbaru
   const handleSubmit = async () => {
-    if (!selected) return;
-    const returned = Math.max(0, Math.min(returnedCount, selected.paid_count));
+    if (!selected || selected.length === 0) return;
+    let remaining = Math.max(0, Math.min(returnedCount, selectedTotalPaid));
+    // Urutkan batch: kupon LUNAS terakhir terlebih dahulu (end_index DESC)
+    const ordered = [...selected].sort((a, b) => b.end_index - a.end_index);
     setSubmitting(true);
     try {
-      await processRow(selected, returned, extraNote.trim());
+      for (const row of ordered) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, row.paid_count);
+        if (take <= 0) continue;
+        await processRow(row, take, extraNote.trim());
+        remaining -= take;
+      }
       closeDialog();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
