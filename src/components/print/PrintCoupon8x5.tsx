@@ -306,56 +306,8 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
   // Constants
   const REKENING_NUMBER = "0082-0100-3537-567";
   const KANTOR_NUMBER = "0821 8802 0656";
-  // Use the imported asset so rendering/load happens from the local assets folder
-  const BG_IMAGE_URL = BG_IMAGE;
-  
-  // Preload background once and reuse as a data URL to avoid repeated network fetches
-  const [bgDataUrl, setBgDataUrl] = React.useState<string | null>(null);
-  const [imageError, setImageError] = React.useState(false);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    const img = new Image();
-    // Try to load with anonymous CORS so we can draw to canvas
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width || 1;
-        canvas.height = img.naturalHeight || img.height || 1;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/svg');
-          setBgDataUrl(dataUrl);
-        } else {
-          // fallback to original URL if canvas unavailable
-          setBgDataUrl(BG_IMAGE_URL);
-        }
-        setImageError(false);
-      } catch (err) {
-        // On any error, fallback to using the original imported URL
-        setBgDataUrl(BG_IMAGE_URL);
-        setImageError(false);
-        // eslint-disable-next-line no-console
-        console.warn('Failed to convert bg image to data URL, using original URL', err);
-      }
-    };
-    img.onerror = () => {
-      if (cancelled) return;
-      setBgDataUrl(null);
-      setImageError(true);
-      // eslint-disable-next-line no-console
-      console.warn('Background image failed to load:', BG_IMAGE_URL);
-    };
-    img.src = BG_IMAGE_URL;
-    return () => {
-      cancelled = true;
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [BG_IMAGE_URL]);
+  // Single source of truth: imported asset from src/assets (resolved & hashed by Vite)
+  const bgDataUrl = BG_IMAGE;
 
   const printContent = (
     <>
