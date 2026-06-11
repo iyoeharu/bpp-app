@@ -69,7 +69,7 @@ export const determineContractStatus = (input: ContractStatusInput): ContractSta
   // Threshold: 0 = Sangat Lancar, 1-3 = Lancar, 4-19 = Kurang Lancar, >=20 = Macet
   if (gap <= 0) return 'sangat_lancar';
   if (gap <= 3) return 'lancar';
-  if (gap <= 19) return 'kurang_lancar';
+  if (gap <= 20) return 'kurang_lancar';
   return 'macet';
 };
 

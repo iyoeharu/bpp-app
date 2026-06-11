@@ -73,6 +73,12 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
   }, [contractId, contracts, collectorId]);
 
+  // Default jumlah kupon = sisa kupon kontrak (range penuh dari kupon berikutnya s/d kupon terakhir)
+  useEffect(() => {
+    if (!selectedContract) return;
+    if (maxCoupons > 0) setCouponCount(maxCoupons);
+  }, [selectedContract?.id, maxCoupons]);
+
   // Reset kontrak jika tidak lagi sesuai filter kolektor
   useEffect(() => {
     if (!collectorId || !contractId) return;
