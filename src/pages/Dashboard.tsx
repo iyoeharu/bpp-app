@@ -198,15 +198,11 @@ export default function Dashboard() {
   }, [monthlyData?.total_modal, monthlyData?.total_omset]);
 
   // ===== YEARLY DERIVED VALUES =====
-  // Komisi tahunan (12 bulan) — gunakan bonus 0.8% saja (NO tier calculation untuk tahunan).
-  // Formula: Total Omset Tahunan × 0.8%
-  // Catatan: Tier calculation hanya untuk bulanan. Tahunan hanya menggunakan bonus 0.8%.
-  const yearlyCommissionTotal = useMemo(() => {
-    const totalOmset = yearlyFinancial?.total_omset || 0;
-    if (totalOmset <= 0) return 0;
-    const YEARLY_BONUS_PERCENTAGE = 0.8; // Bonus tetap 0.8% untuk tahunan
-    return (totalOmset * YEARLY_BONUS_PERCENTAGE) / 100;
-  }, [yearlyFinancial?.total_omset]);
+  // Komisi tahunan = SUM komisi bulanan (tier-based per bulan), langsung dari hook.
+  const yearlyCommissionTotal = useMemo(
+    () => yearlyFinancial?.total_commission ?? 0,
+    [yearlyFinancial?.total_commission],
+  );
 
   // Margin kotor tahunan: (omset - modal) / modal * 100
   const yearlyGrossProfitMargin = useMemo(() => {
