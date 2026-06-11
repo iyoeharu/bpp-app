@@ -88,9 +88,11 @@ export interface YearlyFinancialSummary {
  *   cicilan yang BELUM dibayar (status = 'unpaid').
  * - Konsisten dengan Sisa Tagihan bulanan (yaitu sum dari semua bulan dlm tahun ini).
  * 
- * TERTAGIH (total_collected) — KONTRAK BARU TAHUN INI:
- * - Untuk kontrak yang start_date-nya di tahun ini, jumlahkan semua kupon
- *   cicilan yang SUDAH dibayar (status = 'paid'). Simetris dengan Sisa Tagihan.
+ * TERTAGIH (total_collected) — SUM DARI TERTAGIH BULANAN:
+ * - Setiap bulan dihitung dari SUM(payment_logs.amount_paid) yang payment_date-nya
+ *   di bulan tersebut (cash basis, sama dengan card Tertagih di dashboard bulanan).
+ * - Total tahunan = gabungan (sum) dari Tertagih setiap bulan dalam tahun ini.
+ * - Dengan demikian yearly `total_collected` identik dengan jumlah 12 card bulanan.
  * 
  * Status Kontrak (NEW):
  * - sangat_lancar: Tidak ada keterlambatan sama sekali (0 hari terlambat)
@@ -201,7 +203,6 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       // Totals (CONTRACT BASIS untuk modal/omset/profit, CASH untuk collected)
       let totalModal = 0;
       let totalOmset = 0;
-      let totalCollected = 0;
       let totalExpenses = 0;
 
       const agentYearlyOmset = new Map<string, number>();
@@ -272,7 +273,6 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       (payments || []).forEach((p: any) => {
         if (!p.payment_date) return;
         const amt = Number(p.amount_paid || 0);
-        totalCollected += amt;
         const mk = format(new Date(p.payment_date), 'yyyy-MM');
         const md = monthlyData.get(mk);
         if (md) md.collected += amt;
@@ -363,11 +363,15 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         return s + Number(c.amount || 0);
       }, 0);
 
+      // TERTAGIH tahunan = gabungan (sum) dari Tertagih setiap bulan
+      // (identik dengan jumlah 12 card Tertagih bulanan di dashboard)
+      const totalCollected = Array.from(monthlyData.values()).reduce((s, m) => s + m.collected, 0);
+
       const totalProfit = totalOmset - totalModal;
       const netProfit = totalProfit - totalCommission - totalExpenses;
       const netProfitPct = totalOmset > 0 ? (netProfit / totalOmset) * 100 : 0;
       const profitMargin = totalModal > 0 ? (totalProfit / totalModal) * 100 : 0;
-  const expectedTotal = totalToCollect + totalCollected;
+      const expectedTotal = totalToCollect + totalCollected;
       const collectionRate = expectedTotal > 0 ? (totalCollected / expectedTotal) * 100 : 0;
 
       // Agent results - BEST PRACTICE: Include all agents (even with 0 contracts in year)
