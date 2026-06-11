@@ -336,7 +336,10 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0" align="start">
-                  <Command>
+                  <Command filter={(value, search) => {
+                    if (!search) return 1;
+                    return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+                  }}>
                     <CommandInput placeholder="Cari kontrak atau konsumen..." className="h-9" />
                     <CommandList>
                       <CommandEmpty>Tidak ditemukan.</CommandEmpty>
