@@ -1,10 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { formatRupiah } from "@/lib/format";
 import type { OutstandingDetailsSummary } from "@/hooks/useOutstandingDetails";
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
 
 interface Props {
   open: boolean;
