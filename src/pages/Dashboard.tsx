@@ -387,12 +387,12 @@ export default function Dashboard() {
         <StatCard
           icon={Users}
           iconColor="text-cyan-500"
-          label="Gaji Kolektor"
-          value={opCollectorSalaryTotal}
+          label="Gaji Karyawan"
+          value={opStaffSalaryTotal}
           valueColor="text-cyan-600"
           isNegative
-          subtitle="Total gaji bulan ini"
-          hoverInfo="Total gaji semua kolektor pada bulan ini (dipisahkan dari biaya operasional)."
+          subtitle="Total gaji karyawan bulan ini"
+          hoverInfo="Total gaji karyawan (per posisi) pada bulan ini. Dipisahkan dari biaya operasional dan diinput pada halaman Gaji Karyawan."
         />
 
         <StatCard
