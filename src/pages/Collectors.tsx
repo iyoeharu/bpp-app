@@ -84,14 +84,53 @@ export default function Collectors() {
 
   // Gaji posisi lain (string-based)
   const { data: staffSalaries } = useStaffSalaries(selectedMonth);
+  const { data: positionRegistry } = useStaffPositionsRegistry();
   const totalStaffSalary = useStaffSalaryTotal(selectedMonth);
   const setStaffSalary = useSetStaffSalary();
   const deleteStaffSalary = useDeleteStaffSalary();
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
+  // Saat row "virtual" (posisi dari registry, belum ada baris bulan ini),
+  // posisi & nama tetap di-lock — admin hanya mengisi nominal.
+  const [staffLocked, setStaffLocked] = useState(false);
   const [staffPosition, setStaffPosition] = useState("");
   const [staffName, setStaffName] = useState("");
   const [staffAmount, setStaffAmount] = useState<number>(0);
+
+  // Gabungan: baris gaji bulan ini + posisi dari registry yg belum diisi bulan ini.
+  // Virtual rows (id null) artinya posisi sudah pernah ada — admin tinggal isi nominal.
+  type MergedStaffRow = {
+    id: string | null;
+    position: string;
+    name: string;
+    amount: number;
+    isVirtual: boolean;
+  };
+  const mergedStaffRows: MergedStaffRow[] = (() => {
+    const map = new Map<string, MergedStaffRow>();
+    (staffSalaries || []).forEach((r) => {
+      map.set(r.position.toLowerCase(), {
+        id: r.id,
+        position: r.position,
+        name: r.name || "",
+        amount: r.amount,
+        isVirtual: false,
+      });
+    });
+    (positionRegistry || []).forEach((r) => {
+      const key = r.position.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: null,
+          position: r.position,
+          name: r.name,
+          amount: 0,
+          isVirtual: true,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.position.localeCompare(b.position));
+  })();
 
   const handleOpenStaffCreate = () => {
     setStaffEditTarget(null);
