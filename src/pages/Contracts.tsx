@@ -730,8 +730,9 @@ export default function Contracts() {
         console.error('Failed to set query data for coupons:', e);
       }
 
-      // Trigger print
+      // Trigger print (cetak pertama dari "Buat & Cetak")
       doPrint(couponsAvailable, (fullContract || newContract) as ContractWithCustomer);
+      incrementPrintCount(newContract.id);
     } catch (error) {
       console.error('handleCreateAndPrint error:', error);
       const msg = error instanceof Error ? error.message : 'Gagal membuat kontrak / mencetak kupon';
