@@ -130,7 +130,9 @@ export default function Contracts() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "return" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "return" | "print" | null>(null);
+  const [pendingPrintContract, setPendingPrintContract] = useState<ContractWithCustomer | null>(null);
+  const [pendingPrintCoupons, setPendingPrintCoupons] = useState<InstallmentCoupon[] | null>(null);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
