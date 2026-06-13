@@ -657,6 +657,7 @@ export default function Collectors() {
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Posisi / Jabatan</TableHead>
+                <TableHead>Nama</TableHead>
                 <TableHead className="text-right">Gaji Bulan Ini</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -664,7 +665,7 @@ export default function Collectors() {
             <TableBody>
               {!staffSalaries || staffSalaries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
                     Belum ada gaji posisi lain untuk bulan ini
                   </TableCell>
                 </TableRow>
@@ -673,6 +674,7 @@ export default function Collectors() {
                   <TableRow key={row.id}>
                     <TableCell>{i + 1}</TableCell>
                     <TableCell className="font-medium">{row.position}</TableCell>
+                    <TableCell>{row.name || "-"}</TableCell>
                     <TableCell className="text-right font-semibold text-blue-600">
                       {formatRupiah(row.amount)}
                     </TableCell>
