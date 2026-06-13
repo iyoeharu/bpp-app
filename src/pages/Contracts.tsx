@@ -1101,7 +1101,7 @@ export default function Contracts() {
 
       {/* Create/Edit Dialog - Enhanced with Scrolling Mechanism */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 p-6 pb-4">
             <DialogTitle>{selectedContract ? "Edit Kontrak" : "Kontrak Kredit Baru"}</DialogTitle>
           </DialogHeader>
