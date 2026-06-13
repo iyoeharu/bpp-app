@@ -25,6 +25,7 @@ const Collection = lazy(() => import("./pages/Collection"));
 const CustomerHistory = lazy(() => import("./pages/CustomerHistory"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Holidays = lazy(() => import("./pages/Holidays"));
+const NotaBelanja = lazy(() => import("./pages/NotaBelanja"));
 
 const queryClient = new QueryClient();
 
@@ -88,6 +89,7 @@ const AppRoutes = () => {
                   <Route path="/contracts" element={<Contracts />} />
                   <Route path="/holidays" element={<Holidays />} />
                   <Route path="/collection" element={<Collection />} />
+                  <Route path="/nota-belanja" element={<NotaBelanja />} />
                   
                   <Route path="/history" element={<CustomerHistory />} />
                   <Route path="/audit-log" element={<AuditLog />} />
