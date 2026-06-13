@@ -714,29 +714,77 @@ export default function Collectors() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!staffSalaries || staffSalaries.length === 0 ? (
+              {mergedStaffRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    Belum ada gaji posisi lain untuk bulan ini
+                    Belum ada posisi karyawan. Klik "Tambah Posisi" untuk membuat.
                   </TableCell>
                 </TableRow>
               ) : (
-                staffSalaries.map((row, i) => (
-                  <TableRow key={row.id}>
+                mergedStaffRows.map((row, i) => (
+                  <TableRow key={row.id ?? `virtual-${row.position}`}>
                     <TableCell>{i + 1}</TableCell>
                     <TableCell className="font-medium">{row.position}</TableCell>
                     <TableCell>{row.name || "-"}</TableCell>
-                    <TableCell className="text-right font-semibold text-blue-600">
-                      {formatRupiah(row.amount)}
+                    <TableCell className="text-right">
+                      {row.isVirtual ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStaffVirtual(row.position, row.name)}
+                          className="text-muted-foreground italic hover:underline"
+                          title="Posisi tersimpan dari bulan sebelumnya — klik untuk mengisi nominal gaji bulan ini"
+                        >
+                          Belum diisi
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-blue-600">{formatRupiah(row.amount)}</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenStaffEdit(row)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteStaff(row)}>
-                          <Trash className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {row.isVirtual ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Isi nominal gaji bulan ini"
+                            onClick={() => handleOpenStaffVirtual(row.position, row.name)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleOpenStaffEdit({
+                                  id: row.id!,
+                                  position: row.position,
+                                  name: row.name,
+                                  amount: row.amount,
+                                  notes: null,
+                                })
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleDeleteStaff({
+                                  id: row.id!,
+                                  position: row.position,
+                                  name: row.name,
+                                  amount: row.amount,
+                                  notes: null,
+                                })
+                              }
+                            >
+                              <Trash className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
