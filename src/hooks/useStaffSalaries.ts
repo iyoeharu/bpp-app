@@ -97,13 +97,15 @@ export const useSetStaffSalary = () => {
     mutationFn: async (input: {
       id?: string;          // existing row id (edit)
       position: string;
+      name: string;
       amount: number;
       month: Date;
     }) => {
       const monthStart = monthKey(input.month);
       const tag = tagFor(input.position);
-      const description = `Gaji ${input.position} - ${format(startOfMonth(input.month), 'MMM yyyy')}`;
-      const notes = `${tag} Gaji bulanan karyawan`;
+      const nameTag = nameTagFor(input.name);
+      const description = `Gaji ${input.position} (${input.name}) - ${format(startOfMonth(input.month), 'MMM yyyy')}`;
+      const notes = `${tag} ${nameTag} Gaji bulanan karyawan`;
 
       if (input.id) {
         if (input.amount <= 0) {
