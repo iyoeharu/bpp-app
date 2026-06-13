@@ -25,6 +25,7 @@ const Collection = lazy(() => import("./pages/Collection"));
 const CustomerHistory = lazy(() => import("./pages/CustomerHistory"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Holidays = lazy(() => import("./pages/Holidays"));
+const NotaBelanja = lazy(() => import("./pages/NotaBelanja"));
 
 const queryClient = new QueryClient();
 
