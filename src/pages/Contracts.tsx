@@ -1425,8 +1425,114 @@ export default function Contracts() {
                       );
                     })()}
                   </div>
+
+                  {/* ===== Daftar Barang / Produk ===== */}
+                  <div className="pt-4 border-t space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatRupiah(products.reduce((s, p) => s + (p.price || 0), 0))}
+                      </span>
+                    </div>
+
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">No</TableHead>
+                            <TableHead>Nama</TableHead>
+                            <TableHead className="text-right">Harga</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Toko</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {products.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground">
+                                Belum ada produk. Tambahkan di bawah.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            products.map((p, i) => (
+                              <TableRow key={i}>
+                                <TableCell>{i + 1}</TableCell>
+                                <TableCell className="font-medium">{p.name}</TableCell>
+                                <TableCell className="text-right">{formatRupiah(p.price || 0)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={p.status === 'hutang' ? 'destructive' : 'secondary'}>
+                                    {p.status === 'hutang' ? 'Hutang' : 'Cash'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{p.store || '-'}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveProduct(i)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                      <div className="md:col-span-4">
+                        <Label className="text-xs">Nama Barang</Label>
+                        <Input
+                          value={newProduct.name}
+                          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                          placeholder="Contoh: Kulkas"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <Label className="text-xs">Harga</Label>
+                        <CurrencyInput
+                          value={newProduct.price}
+                          onValueChange={(val) => setNewProduct({ ...newProduct, price: val || 0 })}
+                          placeholder="Rp 0"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Status</Label>
+                        <Select
+                          value={newProduct.status}
+                          onValueChange={(v: 'hutang' | 'cash') => setNewProduct({ ...newProduct, status: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="hutang">Hutang</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Toko</Label>
+                        <Input
+                          value={newProduct.store}
+                          onChange={(e) => setNewProduct({ ...newProduct, store: e.target.value })}
+                          placeholder="Nama toko"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <Button type="button" onClick={handleAddProduct} className="w-full">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
             </div>
           </div>
+          
           
           <DialogFooter className="shrink-0 p-6 pt-4 border-t">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
