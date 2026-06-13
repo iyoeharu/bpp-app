@@ -46,9 +46,11 @@ export const useStaffSalaries = (month: Date = new Date()) => {
       (data || []).forEach((r: any) => {
         const m = (r.notes || '').match(POSITION_RE);
         if (!m) return;
+        const nm = (r.notes || '').match(NAME_RE);
         rows.push({
           id: r.id,
           position: m[1],
+          name: nm ? nm[1] : '',
           amount: Number(r.amount || 0),
           notes: r.notes,
         });
