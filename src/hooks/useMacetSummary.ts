@@ -7,14 +7,12 @@ import { determineContractStatus } from '@/lib/statusCalculation';
  * Ringkasan kontrak MACET (status real-time).
  *
  * ACUAN: identik dengan halaman Riwayat Pelanggan (useContractStatusMap).
- *   lateDays            = jumlah kupon unpaid yg due_date < hari ini
- *   daysSinceLastPayment = hari sejak due_date kupon PAID terakhir
- *   status              = determineContractStatus({...})
+ *   - lateDays            = hari KERJA (skip Minggu + holiday) sejak due_date kupon
+ *                            paid terakhir (atau created_at jika belum pernah bayar)
+ *                            hingga hari ini, di-cap oleh jumlah kupon overdue.
+ *   - daysSinceLastPayment = hari KERJA sejak baseline yang sama (tanpa cap).
+ *   - status              = determineContractStatus({...})
  * Kontrak dianggap MACET bila status === 'macet'.
- *
- * Card "Macet" di Dashboard (bulanan & tahunan) memakai data GLOBAL — tidak
- * difilter oleh periode start_date, supaya sinkron dengan tampilan Riwayat
- * Pelanggan yang menampilkan semua kontrak macet aktif.
  */
 export interface MacetSummary {
   macet_count: number;
@@ -75,22 +73,51 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     .neq('status', 'returned');
   if (error) throw error;
 
-  // 2. Semua kupon unpaid (utk lateDays & unpaidCount)
+  // 2. Kupon unpaid (total + overdue per kontrak)
   const unpaid = await fetchAll<{ contract_id: string; due_date: string }>(() =>
     supabase.from('installment_coupons').select('contract_id, due_date').eq('status', 'unpaid').order('contract_id'),
   );
-  // 3. Kupon PAID (utk gap macet — pakai due_date kupon terakhir yg dibayar)
+  // 3. Kupon PAID (utk due_date kupon paid terakhir)
   const paidCoupons = await fetchAll<{ contract_id: string; due_date: string }>(() =>
     supabase.from('installment_coupons').select('contract_id, due_date').eq('status', 'paid').order('due_date', { ascending: false }),
   );
 
-  const overdueCountByContract = new Map<string, number>();
-  const unpaidCountByContract = new Map<string, number>();
-  for (const c of unpaid) {
-    unpaidCountByContract.set(c.contract_id, (unpaidCountByContract.get(c.contract_id) || 0) + 1);
-    if (c.due_date < todayStr) {
-      overdueCountByContract.set(c.contract_id, (overdueCountByContract.get(c.contract_id) || 0) + 1);
+  // 4. Holidays (utk hitung hari kerja — SAMA dgn useContractStatusMap)
+  const { data: holidaysData } = await supabase
+    .from('holidays')
+    .select('holiday_date, holiday_type, day_of_week');
+  const holidayDates = new Set<string>();
+  const recurringWeekdays = new Set<number>([0]); // Minggu default libur
+  for (const h of (holidaysData ?? []) as Array<{ holiday_date: string | null; holiday_type: string; day_of_week: number | null }>) {
+    if (h.holiday_type === 'specific_date' && h.holiday_date) holidayDates.add(h.holiday_date);
+    else if (h.holiday_type === 'recurring_weekday' && h.day_of_week != null) recurringWeekdays.add(h.day_of_week);
+  }
+  const isWorkingDay = (d: Date) => {
+    if (recurringWeekdays.has(d.getDay())) return false;
+    const iso = d.toISOString().split('T')[0];
+    if (holidayDates.has(iso)) return false;
+    return true;
+  };
+  const countWorkingDays = (fromIso: string): number => {
+    const from = new Date(fromIso);
+    from.setHours(0, 0, 0, 0);
+    let count = 0;
+    const cur = new Date(from);
+    cur.setDate(cur.getDate() + 1); // exclusive dari fromIso
+    while (cur.getTime() <= today.getTime()) {
+      if (isWorkingDay(cur)) count++;
+      cur.setDate(cur.getDate() + 1);
     }
+    return count;
+  };
+
+  // Agregasi unpaid (overdue + total unpaid)
+  const unpaidByContract = new Map<string, { overdueCount: number; unpaidCount: number }>();
+  for (const c of unpaid) {
+    const prev = unpaidByContract.get(c.contract_id) ?? { overdueCount: 0, unpaidCount: 0 };
+    prev.unpaidCount += 1;
+    if (c.due_date < todayStr) prev.overdueCount += 1;
+    unpaidByContract.set(c.contract_id, prev);
   }
   const lastPaidDueByContract = new Map<string, string>();
   for (const c of paidCoupons) {
@@ -98,17 +125,20 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     if (!cur || c.due_date > cur) lastPaidDueByContract.set(c.contract_id, c.due_date);
   }
 
-  // 4. Filter macet pakai aturan yang sama dgn useContractStatusMap
+  // Filter macet — logika IDENTIK dgn useContractStatusMap
   const macetContracts = (contracts || []).filter((c: any) => {
-    const lateDays = overdueCountByContract.get(c.id) || 0;
-    const unpaidCount = unpaidCountByContract.get(c.id) || 0;
-    const isCompleted = c.status === 'completed' || unpaidCount === 0;
-    const lastPaidDue = lastPaidDueByContract.get(c.id);
+    const unpaidInfo = unpaidByContract.get(c.id) ?? { overdueCount: 0, unpaidCount: 0 };
+    const isCompleted = c.status === 'completed' || unpaidInfo.unpaidCount === 0;
+    let lateDays = 0;
     let daysSinceLastPayment = 0;
-    if (lastPaidDue) {
-      const last = new Date(lastPaidDue);
-      last.setHours(0, 0, 0, 0);
-      daysSinceLastPayment = Math.max(0, Math.floor((today.getTime() - last.getTime()) / 86400000));
+    if (!isCompleted) {
+      const lastPaidDue = lastPaidDueByContract.get(c.id) ?? null;
+      const baseline = lastPaidDue ?? (c.created_at ? c.created_at.split('T')[0] : null);
+      if (baseline) {
+        const working = countWorkingDays(baseline);
+        lateDays = Math.min(working, unpaidInfo.overdueCount);
+        daysSinceLastPayment = working;
+      }
     }
     const status = determineContractStatus({
       status: isCompleted ? 'completed' : c.status,
@@ -119,7 +149,7 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     return status === 'macet';
   });
 
-  // 5. Total dibayar per kontrak (utk outstanding nominal)
+  // Total dibayar per kontrak (utk outstanding nominal)
   const ids = macetContracts.map((c: any) => c.id);
   const paidMap = new Map<string, number>();
   if (ids.length > 0) {
