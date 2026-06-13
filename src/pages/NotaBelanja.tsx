@@ -548,7 +548,7 @@ export default function NotaBelanja() {
             </div>
             <div>
               <Label>Jumlah Pembayaran *</Label>
-              <CurrencyInput value={payAmount} onChange={setPayAmount} />
+              <CurrencyInput value={payAmount} onValueChange={(v) => setPayAmount(v || 0)} />
             </div>
             <div>
               <Label>Catatan</Label>
