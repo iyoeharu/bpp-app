@@ -59,6 +59,7 @@ import {
   useSetStaffSalary,
   useDeleteStaffSalary,
   useStaffSalaryTotal,
+  useStaffPositionsRegistry,
   StaffSalaryRow,
 } from "@/hooks/useStaffSalaries";
 
