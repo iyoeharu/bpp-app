@@ -187,6 +187,7 @@ export const useDeleteStaffSalary = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff_salaries'] });
+      queryClient.invalidateQueries({ queryKey: ['staff_positions_registry'] });
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
       toast.success('Gaji dihapus');
     },
