@@ -665,6 +665,10 @@ export default function Contracts() {
         return;
       }
 
+      // Persist product list for new contract
+      await syncContractProducts(newContract.id);
+
+
       // Generate kupon
       await generateCoupons.mutateAsync({
         contractId: newContract.id,
