@@ -14,12 +14,15 @@ import { toast } from 'sonner';
 
 const CATEGORY = 'Gaji Karyawan';
 const POSITION_RE = /\[position:([^\]]+)\]/;
+const NAME_RE = /\[name:([^\]]+)\]/;
 const tagFor = (position: string) => `[position:${position.trim()}]`;
+const nameTagFor = (name: string) => `[name:${name.trim()}]`;
 const monthKey = (month: Date) => format(startOfMonth(month), 'yyyy-MM-dd');
 
 export interface StaffSalaryRow {
   id: string;
   position: string;
+  name: string;
   amount: number;
   notes: string | null;
 }
