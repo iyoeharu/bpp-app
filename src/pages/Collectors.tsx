@@ -89,24 +89,32 @@ export default function Collectors() {
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
   const [staffPosition, setStaffPosition] = useState("");
+  const [staffName, setStaffName] = useState("");
   const [staffAmount, setStaffAmount] = useState<number>(0);
 
   const handleOpenStaffCreate = () => {
     setStaffEditTarget(null);
     setStaffPosition("");
+    setStaffName("");
     setStaffAmount(0);
     setStaffDialogOpen(true);
   };
   const handleOpenStaffEdit = (row: StaffSalaryRow) => {
     setStaffEditTarget(row);
     setStaffPosition(row.position);
+    setStaffName(row.name || "");
     setStaffAmount(row.amount);
     setStaffDialogOpen(true);
   };
   const handleSaveStaff = async () => {
     const pos = staffPosition.trim();
+    const nm = staffName.trim();
     if (!pos) {
       toast.error("Nama posisi wajib diisi");
+      return;
+    }
+    if (!nm) {
+      toast.error("Nama karyawan wajib diisi");
       return;
     }
     // Cek duplikasi posisi (kecuali saat edit row yg sama)
@@ -120,6 +128,7 @@ export default function Collectors() {
     await setStaffSalary.mutateAsync({
       id: staffEditTarget?.id,
       position: pos,
+      name: nm,
       amount: staffAmount || 0,
       month: selectedMonth,
     });
@@ -648,6 +657,7 @@ export default function Collectors() {
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Posisi / Jabatan</TableHead>
+                <TableHead>Nama</TableHead>
                 <TableHead className="text-right">Gaji Bulan Ini</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -655,7 +665,7 @@ export default function Collectors() {
             <TableBody>
               {!staffSalaries || staffSalaries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
                     Belum ada gaji posisi lain untuk bulan ini
                   </TableCell>
                 </TableRow>
@@ -664,6 +674,7 @@ export default function Collectors() {
                   <TableRow key={row.id}>
                     <TableCell>{i + 1}</TableCell>
                     <TableCell className="font-medium">{row.position}</TableCell>
+                    <TableCell>{row.name || "-"}</TableCell>
                     <TableCell className="text-right font-semibold text-blue-600">
                       {formatRupiah(row.amount)}
                     </TableCell>
@@ -702,6 +713,14 @@ export default function Collectors() {
                 value={staffPosition}
                 onChange={(e) => setStaffPosition(e.target.value)}
                 placeholder="Contoh: Admin, Manajer, Sekretaris"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Nama Karyawan *</Label>
+              <Input
+                value={staffName}
+                onChange={(e) => setStaffName(e.target.value)}
+                placeholder="Contoh: Budi Santoso"
               />
             </div>
             <div className="space-y-2">

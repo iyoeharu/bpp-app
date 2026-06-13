@@ -14,12 +14,15 @@ import { toast } from 'sonner';
 
 const CATEGORY = 'Gaji Karyawan';
 const POSITION_RE = /\[position:([^\]]+)\]/;
+const NAME_RE = /\[name:([^\]]+)\]/;
 const tagFor = (position: string) => `[position:${position.trim()}]`;
+const nameTagFor = (name: string) => `[name:${name.trim()}]`;
 const monthKey = (month: Date) => format(startOfMonth(month), 'yyyy-MM-dd');
 
 export interface StaffSalaryRow {
   id: string;
   position: string;
+  name: string;
   amount: number;
   notes: string | null;
 }
@@ -43,9 +46,11 @@ export const useStaffSalaries = (month: Date = new Date()) => {
       (data || []).forEach((r: any) => {
         const m = (r.notes || '').match(POSITION_RE);
         if (!m) return;
+        const nm = (r.notes || '').match(NAME_RE);
         rows.push({
           id: r.id,
           position: m[1],
+          name: nm ? nm[1] : '',
           amount: Number(r.amount || 0),
           notes: r.notes,
         });
@@ -92,13 +97,15 @@ export const useSetStaffSalary = () => {
     mutationFn: async (input: {
       id?: string;          // existing row id (edit)
       position: string;
+      name: string;
       amount: number;
       month: Date;
     }) => {
       const monthStart = monthKey(input.month);
       const tag = tagFor(input.position);
-      const description = `Gaji ${input.position} - ${format(startOfMonth(input.month), 'MMM yyyy')}`;
-      const notes = `${tag} Gaji bulanan karyawan`;
+      const nameTag = nameTagFor(input.name);
+      const description = `Gaji ${input.position} (${input.name}) - ${format(startOfMonth(input.month), 'MMM yyyy')}`;
+      const notes = `${tag} ${nameTag} Gaji bulanan karyawan`;
 
       if (input.id) {
         if (input.amount <= 0) {

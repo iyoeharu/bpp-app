@@ -156,6 +156,45 @@ export default function Contracts() {
     keuntungan: 0,
   });
 
+  // Product rows for the contract (No, Nama, Harga, Status, Toko)
+  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string };
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '' });
+
+  const handleAddProduct = () => {
+    const name = newProduct.name.trim();
+    if (!name) { toast.error('Nama produk wajib diisi'); return; }
+    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim() }]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+  };
+  const handleRemoveProduct = (idx: number) => {
+    setProducts((arr) => arr.filter((_, i) => i !== idx));
+  };
+
+  // Replace all contract_products for the given contract with the current list
+  const syncContractProducts = async (contractId: string) => {
+    try {
+      await (supabase as any).from('contract_products').delete().eq('contract_id', contractId);
+      if (products.length === 0) return;
+      const rows = products.map((p, i) => ({
+        contract_id: contractId,
+        position: i + 1,
+        name: p.name,
+        price: p.price || 0,
+        status: p.status,
+        store: p.store || null,
+      }));
+      const { error } = await (supabase as any).from('contract_products').insert(rows);
+      if (error) {
+        console.error('Failed to save contract products:', error);
+        toast.error('Gagal menyimpan daftar produk: ' + error.message);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Gagal menyimpan daftar produk');
+    }
+  };
+
   // Fetch coupons for selected contract (for detail view and printing)
   const { data: selectedContractCoupons } = useCouponsByContract(selectedContract?.id || null);
   
@@ -242,6 +281,8 @@ export default function Contracts() {
           dp: 0,
           keuntungan: 0,
         });
+        setProducts([]);
+        setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
         setDialogOpen(true);
         // Remove param from URL
         searchParams.delete('newCustomerId');
@@ -267,6 +308,8 @@ export default function Contracts() {
       dp: 0,
       keuntungan: 0,
     });
+    setProducts([]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
     setDialogOpen(true);
   };
 
@@ -301,6 +344,27 @@ export default function Contracts() {
         return tenor > 0 ? Math.round(totalKeuntungan / tenor) : 0;
       })(),
     });
+    // Load existing products
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from('contract_products')
+        .select('id, name, price, status, store, position')
+        .eq('contract_id', contract.id)
+        .order('position', { ascending: true });
+      if (error) {
+        console.error('Failed to load contract products:', error);
+        setProducts([]);
+      } else {
+        setProducts(((data || []) as any[]).map((p) => ({
+          id: p.id,
+          name: p.name,
+          price: Number(p.price || 0),
+          status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
+          store: p.store || '',
+        })));
+      }
+    })();
     setDialogOpen(true);
   };
 
@@ -482,6 +546,9 @@ export default function Contracts() {
           }
         }
 
+        // Sync product list (replace all)
+        await syncContractProducts(selectedContract.id);
+
         // Refresh selectedContract di state lokal supaya preview/print pakai data baru
         if (updateRes?.data) {
           setSelectedContract(updateRes.data as ContractWithCustomer);
@@ -515,6 +582,9 @@ export default function Contracts() {
           toast.success(`Kontrak dibuat dengan ${tenorDays} kupon`);
         } else {
           toast.success("Kontrak berhasil dibuat");
+        }
+        if (newContract?.id) {
+          await syncContractProducts(newContract.id);
         }
       }
       setDialogOpen(false);
@@ -594,6 +664,10 @@ export default function Contracts() {
         toast.error("Kontrak tidak berhasil dibuat");
         return;
       }
+
+      // Persist product list for new contract
+      await syncContractProducts(newContract.id);
+
 
       // Generate kupon
       await generateCoupons.mutateAsync({
@@ -1351,8 +1425,114 @@ export default function Contracts() {
                       );
                     })()}
                   </div>
+
+                  {/* ===== Daftar Barang / Produk ===== */}
+                  <div className="pt-4 border-t space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatRupiah(products.reduce((s, p) => s + (p.price || 0), 0))}
+                      </span>
+                    </div>
+
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">No</TableHead>
+                            <TableHead>Nama</TableHead>
+                            <TableHead className="text-right">Harga</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Toko</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {products.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground">
+                                Belum ada produk. Tambahkan di bawah.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            products.map((p, i) => (
+                              <TableRow key={i}>
+                                <TableCell>{i + 1}</TableCell>
+                                <TableCell className="font-medium">{p.name}</TableCell>
+                                <TableCell className="text-right">{formatRupiah(p.price || 0)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={p.status === 'hutang' ? 'destructive' : 'secondary'}>
+                                    {p.status === 'hutang' ? 'Hutang' : 'Cash'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{p.store || '-'}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveProduct(i)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                      <div className="md:col-span-4">
+                        <Label className="text-xs">Nama Barang</Label>
+                        <Input
+                          value={newProduct.name}
+                          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                          placeholder="Contoh: Kulkas"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <Label className="text-xs">Harga</Label>
+                        <CurrencyInput
+                          value={newProduct.price}
+                          onValueChange={(val) => setNewProduct({ ...newProduct, price: val || 0 })}
+                          placeholder="Rp 0"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Status</Label>
+                        <Select
+                          value={newProduct.status}
+                          onValueChange={(v: 'hutang' | 'cash') => setNewProduct({ ...newProduct, status: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="hutang">Hutang</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Toko</Label>
+                        <Input
+                          value={newProduct.store}
+                          onChange={(e) => setNewProduct({ ...newProduct, store: e.target.value })}
+                          placeholder="Nama toko"
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <Button type="button" onClick={handleAddProduct} className="w-full">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
             </div>
           </div>
+          
           
           <DialogFooter className="shrink-0 p-6 pt-4 border-t">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
