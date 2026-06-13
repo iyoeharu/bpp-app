@@ -320,6 +320,27 @@ export default function Contracts() {
         return tenor > 0 ? Math.round(totalKeuntungan / tenor) : 0;
       })(),
     });
+    // Load existing products
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from('contract_products')
+        .select('id, name, price, status, store, position')
+        .eq('contract_id', contract.id)
+        .order('position', { ascending: true });
+      if (error) {
+        console.error('Failed to load contract products:', error);
+        setProducts([]);
+      } else {
+        setProducts(((data || []) as any[]).map((p) => ({
+          id: p.id,
+          name: p.name,
+          price: Number(p.price || 0),
+          status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
+          store: p.store || '',
+        })));
+      }
+    })();
     setDialogOpen(true);
   };
 
