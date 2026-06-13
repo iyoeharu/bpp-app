@@ -744,7 +744,7 @@ export default function Collectors() {
                 placeholder="Rp 0"
               />
               <p className="text-xs text-muted-foreground">
-                Otomatis dihitung sebagai biaya operasional di Dashboard.
+                Otomatis dihitung sebagai Gaji karyawan di Dashboard.
               </p>
             </div>
           </div>
