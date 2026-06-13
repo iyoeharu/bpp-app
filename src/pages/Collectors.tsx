@@ -89,24 +89,32 @@ export default function Collectors() {
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
   const [staffPosition, setStaffPosition] = useState("");
+  const [staffName, setStaffName] = useState("");
   const [staffAmount, setStaffAmount] = useState<number>(0);
 
   const handleOpenStaffCreate = () => {
     setStaffEditTarget(null);
     setStaffPosition("");
+    setStaffName("");
     setStaffAmount(0);
     setStaffDialogOpen(true);
   };
   const handleOpenStaffEdit = (row: StaffSalaryRow) => {
     setStaffEditTarget(row);
     setStaffPosition(row.position);
+    setStaffName(row.name || "");
     setStaffAmount(row.amount);
     setStaffDialogOpen(true);
   };
   const handleSaveStaff = async () => {
     const pos = staffPosition.trim();
+    const nm = staffName.trim();
     if (!pos) {
       toast.error("Nama posisi wajib diisi");
+      return;
+    }
+    if (!nm) {
+      toast.error("Nama karyawan wajib diisi");
       return;
     }
     // Cek duplikasi posisi (kecuali saat edit row yg sama)
@@ -120,6 +128,7 @@ export default function Collectors() {
     await setStaffSalary.mutateAsync({
       id: staffEditTarget?.id,
       position: pos,
+      name: nm,
       amount: staffAmount || 0,
       month: selectedMonth,
     });
