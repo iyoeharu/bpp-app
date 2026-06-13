@@ -171,6 +171,30 @@ export default function Contracts() {
     setProducts((arr) => arr.filter((_, i) => i !== idx));
   };
 
+  // Replace all contract_products for the given contract with the current list
+  const syncContractProducts = async (contractId: string) => {
+    try {
+      await (supabase as any).from('contract_products').delete().eq('contract_id', contractId);
+      if (products.length === 0) return;
+      const rows = products.map((p, i) => ({
+        contract_id: contractId,
+        position: i + 1,
+        name: p.name,
+        price: p.price || 0,
+        status: p.status,
+        store: p.store || null,
+      }));
+      const { error } = await (supabase as any).from('contract_products').insert(rows);
+      if (error) {
+        console.error('Failed to save contract products:', error);
+        toast.error('Gagal menyimpan daftar produk: ' + error.message);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Gagal menyimpan daftar produk');
+    }
+  };
+
   // Fetch coupons for selected contract (for detail view and printing)
   const { data: selectedContractCoupons } = useCouponsByContract(selectedContract?.id || null);
   
