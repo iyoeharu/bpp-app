@@ -1850,6 +1850,8 @@ export default function Contracts() {
                 setPasswordDialogOpen(false);
                 setPasswordInput("");
                 setPendingAction(null);
+                setPendingPrintCoupons(null);
+                setPendingPrintContract(null);
               }}
             >
               Batal
