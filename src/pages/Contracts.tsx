@@ -419,6 +419,13 @@ export default function Contracts() {
         await executeContractDelete();
       } else if (pendingAction === "return") {
         await executeContractReturn();
+      } else if (pendingAction === "print") {
+        if (pendingPrintCoupons && pendingPrintContract) {
+          doPrint(pendingPrintCoupons, pendingPrintContract);
+          incrementPrintCount(pendingPrintContract.id);
+        }
+        setPendingPrintCoupons(null);
+        setPendingPrintContract(null);
       }
     } catch (error) {
       console.error('Password verification error:', error);
