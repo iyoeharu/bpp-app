@@ -282,6 +282,8 @@ export default function Contracts() {
       dp: 0,
       keuntungan: 0,
     });
+    setProducts([]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
     setDialogOpen(true);
   };
 
