@@ -41,6 +41,7 @@ const masterItems = [
 
 const operationItems = [
   { title: "Penagihan", url: "/collection", icon: Wallet },
+  { title: "Nota Belanja", url: "/nota-belanja", icon: Receipt },
   { title: "Riwayat Pelanggan", url: "/history", icon: History },
 ];
 
