@@ -881,7 +881,8 @@ export default function Contracts() {
     // Add class to body for print mode
     document.body.classList.add('printing-coupons');
 
-    // Give more time for the component to render via portal
+    // Delay 2 detik agar background SVG (Mahkota-Jaya) ter-render sempurna
+    // sebelum dialog cetak dibuka.
     setTimeout(() => {
       console.log("Triggering print dialog with A4 landscape settings (direct)");
       window.print();
@@ -901,8 +902,9 @@ export default function Contracts() {
 
       // Fallback cleanup after delay
       setTimeout(cleanup, 2000);
-    }, 500);
+    }, 2000);
   };
+
 
   const getNoFaktur = (contractId: string) => {
     const invoice = invoiceDetails?.find((i) => i.id === contractId);

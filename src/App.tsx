@@ -7,6 +7,7 @@ import { Suspense, lazy } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
 import { AdminNoteProvider } from "@/contexts/AdminNoteContext";
+import { useDatabaseKeepAlive } from "@/hooks/useDatabaseKeepAlive";
 
 // Eager imports for frequently accessed/small pages
 import Auth from "./pages/Auth";
@@ -57,6 +58,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 const AppRoutes = () => {
   const { isAuthenticated, isLoading } = useAuthContext();
+  useDatabaseKeepAlive();
 
   if (isLoading) {
     return (

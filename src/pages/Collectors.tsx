@@ -713,7 +713,13 @@ export default function Collectors() {
                 value={staffPosition}
                 onChange={(e) => setStaffPosition(e.target.value)}
                 placeholder="Contoh: Admin, Manajer, Sekretaris"
+                disabled={!!staffEditTarget}
               />
+              {staffEditTarget && (
+                <p className="text-xs text-muted-foreground">
+                  Nama posisi tidak dapat diubah. Hapus baris jika ingin mengganti posisi.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Nama Karyawan *</Label>
@@ -721,8 +727,15 @@ export default function Collectors() {
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
                 placeholder="Contoh: Budi Santoso"
+                disabled={!!staffEditTarget}
               />
+              {staffEditTarget && (
+                <p className="text-xs text-muted-foreground">
+                  Nama karyawan tidak dapat diubah. Hanya nominal gaji yang dapat diperbarui.
+                </p>
+              )}
             </div>
+
             <div className="space-y-2">
               <Label>Gaji Bulan Ini</Label>
               <CurrencyInput
