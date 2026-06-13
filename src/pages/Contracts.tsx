@@ -814,13 +814,37 @@ export default function Contracts() {
     }
   };
 
+  // Hitung berapa kali kupon kontrak ini sudah pernah dicetak (per-browser).
+  const PRINT_COUNT_KEY = (contractId: string) => `coupon_print_count_${contractId}`;
+  const getPrintCount = (contractId: string): number => {
+    try {
+      return parseInt(localStorage.getItem(PRINT_COUNT_KEY(contractId)) || "0", 10) || 0;
+    } catch { return 0; }
+  };
+  const incrementPrintCount = (contractId: string) => {
+    try {
+      const next = getPrintCount(contractId) + 1;
+      localStorage.setItem(PRINT_COUNT_KEY(contractId), String(next));
+    } catch { /* noop */ }
+  };
+
   const handlePrintAllCoupons = () => {
     // Default print path uses currently loaded coupons from hook
     if (!selectedContractCoupons?.length) {
       toast.error("Tidak ada kupon untuk dicetak");
       return;
     }
+    if (!selectedContract) return;
+    // Cetak ulang (>1x) wajib password
+    if (getPrintCount(selectedContract.id) >= 1) {
+      setPendingPrintCoupons(selectedContractCoupons as InstallmentCoupon[]);
+      setPendingPrintContract(selectedContract);
+      setPendingAction("print");
+      setPasswordDialogOpen(true);
+      return;
+    }
     doPrint(selectedContractCoupons, selectedContract);
+    incrementPrintCount(selectedContract.id);
   };
 
   // Centralized print helper that accepts coupons + contract directly.
