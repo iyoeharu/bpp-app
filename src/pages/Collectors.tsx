@@ -716,6 +716,14 @@ export default function Collectors() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Nama Karyawan *</Label>
+              <Input
+                value={staffName}
+                onChange={(e) => setStaffName(e.target.value)}
+                placeholder="Contoh: Budi Santoso"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Gaji Bulan Ini</Label>
               <CurrencyInput
                 value={staffAmount}
