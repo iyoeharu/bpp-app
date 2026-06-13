@@ -134,6 +134,7 @@ export default function Collectors() {
 
   const handleOpenStaffCreate = () => {
     setStaffEditTarget(null);
+    setStaffLocked(false);
     setStaffPosition("");
     setStaffName("");
     setStaffAmount(0);
@@ -141,9 +142,19 @@ export default function Collectors() {
   };
   const handleOpenStaffEdit = (row: StaffSalaryRow) => {
     setStaffEditTarget(row);
+    setStaffLocked(true);
     setStaffPosition(row.position);
     setStaffName(row.name || "");
     setStaffAmount(row.amount);
+    setStaffDialogOpen(true);
+  };
+  // Untuk baris virtual (posisi dari registry, belum ada baris bulan ini)
+  const handleOpenStaffVirtual = (position: string, name: string) => {
+    setStaffEditTarget(null);
+    setStaffLocked(true);
+    setStaffPosition(position);
+    setStaffName(name);
+    setStaffAmount(0);
     setStaffDialogOpen(true);
   };
   const handleSaveStaff = async () => {
