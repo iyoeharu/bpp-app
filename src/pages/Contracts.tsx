@@ -156,6 +156,21 @@ export default function Contracts() {
     keuntungan: 0,
   });
 
+  // Product rows for the contract (No, Nama, Harga, Status, Toko)
+  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string };
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '' });
+
+  const handleAddProduct = () => {
+    const name = newProduct.name.trim();
+    if (!name) { toast.error('Nama produk wajib diisi'); return; }
+    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim() }]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+  };
+  const handleRemoveProduct = (idx: number) => {
+    setProducts((arr) => arr.filter((_, i) => i !== idx));
+  };
+
   // Fetch coupons for selected contract (for detail view and printing)
   const { data: selectedContractCoupons } = useCouponsByContract(selectedContract?.id || null);
   
