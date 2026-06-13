@@ -559,6 +559,9 @@ export default function Contracts() {
         } else {
           toast.success("Kontrak berhasil dibuat");
         }
+        if (newContract?.id) {
+          await syncContractProducts(newContract.id);
+        }
       }
       setDialogOpen(false);
     } catch (error) {
