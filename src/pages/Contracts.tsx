@@ -1366,11 +1366,11 @@ export default function Contracts() {
                     <Textarea
                       id="product_type"
                       value={formData.product_type}
-                      onChange={(e) => setFormData({ ...formData, product_type: e.target.value })}
-                      placeholder="Contoh: Elektronik"
-                      className="max-h-40 resize-y overflow-auto"
+                      readOnly
+                      placeholder="Otomatis terisi dari Daftar Barang / Produk di bawah"
+                      className="max-h-40 resize-y overflow-auto bg-muted/40"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Tuliskan jenis produk. Jika panjang, kotak ini dapat digulir.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Otomatis mengikuti nama produk pada Daftar Barang / Produk.</p>
                   </div>
                   <div>
                     <Label htmlFor="tenor_days">
