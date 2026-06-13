@@ -163,6 +163,13 @@ export default function Contracts() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '' });
 
+  // Auto-sync product_type textarea with product names list
+  useEffect(() => {
+    const joined = products.map((p) => p.name).filter(Boolean).join(', ');
+    setFormData((prev) => (prev.product_type === joined ? prev : { ...prev, product_type: joined }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
     if (!name) { toast.error('Nama produk wajib diisi'); return; }
