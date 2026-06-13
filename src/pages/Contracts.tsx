@@ -130,7 +130,9 @@ export default function Contracts() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "return" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "return" | "print" | null>(null);
+  const [pendingPrintContract, setPendingPrintContract] = useState<ContractWithCustomer | null>(null);
+  const [pendingPrintCoupons, setPendingPrintCoupons] = useState<InstallmentCoupon[] | null>(null);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
@@ -417,6 +419,13 @@ export default function Contracts() {
         await executeContractDelete();
       } else if (pendingAction === "return") {
         await executeContractReturn();
+      } else if (pendingAction === "print") {
+        if (pendingPrintCoupons && pendingPrintContract) {
+          doPrint(pendingPrintCoupons, pendingPrintContract);
+          incrementPrintCount(pendingPrintContract.id);
+        }
+        setPendingPrintCoupons(null);
+        setPendingPrintContract(null);
       }
     } catch (error) {
       console.error('Password verification error:', error);
@@ -728,8 +737,9 @@ export default function Contracts() {
         console.error('Failed to set query data for coupons:', e);
       }
 
-      // Trigger print
+      // Trigger print (cetak pertama dari "Buat & Cetak")
       doPrint(couponsAvailable, (fullContract || newContract) as ContractWithCustomer);
+      incrementPrintCount(newContract.id);
     } catch (error) {
       console.error('handleCreateAndPrint error:', error);
       const msg = error instanceof Error ? error.message : 'Gagal membuat kontrak / mencetak kupon';
@@ -812,13 +822,37 @@ export default function Contracts() {
     }
   };
 
+  // Hitung berapa kali kupon kontrak ini sudah pernah dicetak (per-browser).
+  const PRINT_COUNT_KEY = (contractId: string) => `coupon_print_count_${contractId}`;
+  const getPrintCount = (contractId: string): number => {
+    try {
+      return parseInt(localStorage.getItem(PRINT_COUNT_KEY(contractId)) || "0", 10) || 0;
+    } catch { return 0; }
+  };
+  const incrementPrintCount = (contractId: string) => {
+    try {
+      const next = getPrintCount(contractId) + 1;
+      localStorage.setItem(PRINT_COUNT_KEY(contractId), String(next));
+    } catch { /* noop */ }
+  };
+
   const handlePrintAllCoupons = () => {
     // Default print path uses currently loaded coupons from hook
     if (!selectedContractCoupons?.length) {
       toast.error("Tidak ada kupon untuk dicetak");
       return;
     }
+    if (!selectedContract) return;
+    // Cetak ulang (>1x) wajib password
+    if (getPrintCount(selectedContract.id) >= 1) {
+      setPendingPrintCoupons(selectedContractCoupons as InstallmentCoupon[]);
+      setPendingPrintContract(selectedContract);
+      setPendingAction("print");
+      setPasswordDialogOpen(true);
+      return;
+    }
     doPrint(selectedContractCoupons, selectedContract);
+    incrementPrintCount(selectedContract.id);
   };
 
   // Centralized print helper that accepts coupons + contract directly.
@@ -1816,6 +1850,8 @@ export default function Contracts() {
                 setPasswordDialogOpen(false);
                 setPasswordInput("");
                 setPendingAction(null);
+                setPendingPrintCoupons(null);
+                setPendingPrintContract(null);
               }}
             >
               Batal

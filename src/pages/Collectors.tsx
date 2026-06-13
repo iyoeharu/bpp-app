@@ -59,6 +59,7 @@ import {
   useSetStaffSalary,
   useDeleteStaffSalary,
   useStaffSalaryTotal,
+  useStaffPositionsRegistry,
   StaffSalaryRow,
 } from "@/hooks/useStaffSalaries";
 
@@ -83,17 +84,57 @@ export default function Collectors() {
 
   // Gaji posisi lain (string-based)
   const { data: staffSalaries } = useStaffSalaries(selectedMonth);
+  const { data: positionRegistry } = useStaffPositionsRegistry();
   const totalStaffSalary = useStaffSalaryTotal(selectedMonth);
   const setStaffSalary = useSetStaffSalary();
   const deleteStaffSalary = useDeleteStaffSalary();
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [staffEditTarget, setStaffEditTarget] = useState<StaffSalaryRow | null>(null);
+  // Saat row "virtual" (posisi dari registry, belum ada baris bulan ini),
+  // posisi & nama tetap di-lock — admin hanya mengisi nominal.
+  const [staffLocked, setStaffLocked] = useState(false);
   const [staffPosition, setStaffPosition] = useState("");
   const [staffName, setStaffName] = useState("");
   const [staffAmount, setStaffAmount] = useState<number>(0);
 
+  // Gabungan: baris gaji bulan ini + posisi dari registry yg belum diisi bulan ini.
+  // Virtual rows (id null) artinya posisi sudah pernah ada — admin tinggal isi nominal.
+  type MergedStaffRow = {
+    id: string | null;
+    position: string;
+    name: string;
+    amount: number;
+    isVirtual: boolean;
+  };
+  const mergedStaffRows: MergedStaffRow[] = (() => {
+    const map = new Map<string, MergedStaffRow>();
+    (staffSalaries || []).forEach((r) => {
+      map.set(r.position.toLowerCase(), {
+        id: r.id,
+        position: r.position,
+        name: r.name || "",
+        amount: r.amount,
+        isVirtual: false,
+      });
+    });
+    (positionRegistry || []).forEach((r) => {
+      const key = r.position.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: null,
+          position: r.position,
+          name: r.name,
+          amount: 0,
+          isVirtual: true,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.position.localeCompare(b.position));
+  })();
+
   const handleOpenStaffCreate = () => {
     setStaffEditTarget(null);
+    setStaffLocked(false);
     setStaffPosition("");
     setStaffName("");
     setStaffAmount(0);
@@ -101,9 +142,19 @@ export default function Collectors() {
   };
   const handleOpenStaffEdit = (row: StaffSalaryRow) => {
     setStaffEditTarget(row);
+    setStaffLocked(true);
     setStaffPosition(row.position);
     setStaffName(row.name || "");
     setStaffAmount(row.amount);
+    setStaffDialogOpen(true);
+  };
+  // Untuk baris virtual (posisi dari registry, belum ada baris bulan ini)
+  const handleOpenStaffVirtual = (position: string, name: string) => {
+    setStaffEditTarget(null);
+    setStaffLocked(true);
+    setStaffPosition(position);
+    setStaffName(name);
+    setStaffAmount(0);
     setStaffDialogOpen(true);
   };
   const handleSaveStaff = async () => {
@@ -663,29 +714,77 @@ export default function Collectors() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!staffSalaries || staffSalaries.length === 0 ? (
+              {mergedStaffRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    Belum ada gaji posisi lain untuk bulan ini
+                    Belum ada posisi karyawan. Klik "Tambah Posisi" untuk membuat.
                   </TableCell>
                 </TableRow>
               ) : (
-                staffSalaries.map((row, i) => (
-                  <TableRow key={row.id}>
+                mergedStaffRows.map((row, i) => (
+                  <TableRow key={row.id ?? `virtual-${row.position}`}>
                     <TableCell>{i + 1}</TableCell>
                     <TableCell className="font-medium">{row.position}</TableCell>
                     <TableCell>{row.name || "-"}</TableCell>
-                    <TableCell className="text-right font-semibold text-blue-600">
-                      {formatRupiah(row.amount)}
+                    <TableCell className="text-right">
+                      {row.isVirtual ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStaffVirtual(row.position, row.name)}
+                          className="text-muted-foreground italic hover:underline"
+                          title="Posisi tersimpan dari bulan sebelumnya — klik untuk mengisi nominal gaji bulan ini"
+                        >
+                          Belum diisi
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-blue-600">{formatRupiah(row.amount)}</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenStaffEdit(row)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteStaff(row)}>
-                          <Trash className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {row.isVirtual ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Isi nominal gaji bulan ini"
+                            onClick={() => handleOpenStaffVirtual(row.position, row.name)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleOpenStaffEdit({
+                                  id: row.id!,
+                                  position: row.position,
+                                  name: row.name,
+                                  amount: row.amount,
+                                  notes: null,
+                                })
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleDeleteStaff({
+                                  id: row.id!,
+                                  position: row.position,
+                                  name: row.name,
+                                  amount: row.amount,
+                                  notes: null,
+                                })
+                              }
+                            >
+                              <Trash className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -713,11 +812,11 @@ export default function Collectors() {
                 value={staffPosition}
                 onChange={(e) => setStaffPosition(e.target.value)}
                 placeholder="Contoh: Admin, Manajer, Sekretaris"
-                disabled={!!staffEditTarget}
+                disabled={staffLocked}
               />
-              {staffEditTarget && (
+              {staffLocked && (
                 <p className="text-xs text-muted-foreground">
-                  Nama posisi tidak dapat diubah. Hapus baris jika ingin mengganti posisi.
+                  Posisi sudah permanen dari bulan sebelumnya. Hanya nominal gaji yang dapat diperbarui.
                 </p>
               )}
             </div>
@@ -727,13 +826,8 @@ export default function Collectors() {
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
                 placeholder="Contoh: Budi Santoso"
-                disabled={!!staffEditTarget}
+                disabled={staffLocked}
               />
-              {staffEditTarget && (
-                <p className="text-xs text-muted-foreground">
-                  Nama karyawan tidak dapat diubah. Hanya nominal gaji yang dapat diperbarui.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -744,7 +838,7 @@ export default function Collectors() {
                 placeholder="Rp 0"
               />
               <p className="text-xs text-muted-foreground">
-                Otomatis dihitung sebagai Gaji karyawan di Dashboard.
+                Otomatis dihitung sebagai Gaji karyawan di Dashboard. Posisi & nama akan tetap muncul di bulan-bulan berikutnya — Anda cukup mengisi nominal.
               </p>
             </div>
           </div>

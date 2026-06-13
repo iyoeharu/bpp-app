@@ -27,6 +27,42 @@ export interface StaffSalaryRow {
   notes: string | null;
 }
 
+export interface StaffPositionRegistryEntry {
+  position: string;
+  name: string;
+}
+
+/**
+ * Registry semua posisi+nama karyawan yang pernah dibuat (lintas bulan).
+ * Dipakai untuk auto-prefill posisi pada bulan-bulan berikutnya — admin
+ * cukup mengisi nominal gaji bulan berjalan.
+ */
+export const useStaffPositionsRegistry = () => {
+  return useQuery({
+    queryKey: ['staff_positions_registry'],
+    queryFn: async (): Promise<StaffPositionRegistryEntry[]> => {
+      const { data, error } = await supabase
+        .from('operational_expenses')
+        .select('notes, expense_date')
+        .eq('category', CATEGORY)
+        .order('expense_date', { ascending: false });
+      if (error) throw error;
+
+      const map = new Map<string, StaffPositionRegistryEntry>();
+      (data || []).forEach((r: any) => {
+        const pm = (r.notes || '').match(POSITION_RE);
+        if (!pm) return;
+        const position = pm[1].trim();
+        const nm = (r.notes || '').match(NAME_RE);
+        const name = nm ? nm[1].trim() : '';
+        const key = position.toLowerCase();
+        if (!map.has(key)) map.set(key, { position, name });
+      });
+      return Array.from(map.values()).sort((a, b) => a.position.localeCompare(b.position));
+    },
+  });
+};
+
 export const useStaffSalaries = (month: Date = new Date()) => {
   const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
@@ -134,6 +170,7 @@ export const useSetStaffSalary = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff_salaries'] });
+      queryClient.invalidateQueries({ queryKey: ['staff_positions_registry'] });
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
       toast.success('Gaji karyawan disimpan');
     },
@@ -150,6 +187,7 @@ export const useDeleteStaffSalary = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff_salaries'] });
+      queryClient.invalidateQueries({ queryKey: ['staff_positions_registry'] });
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
       toast.success('Gaji dihapus');
     },
