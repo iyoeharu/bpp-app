@@ -812,11 +812,11 @@ export default function Collectors() {
                 value={staffPosition}
                 onChange={(e) => setStaffPosition(e.target.value)}
                 placeholder="Contoh: Admin, Manajer, Sekretaris"
-                disabled={!!staffEditTarget}
+                disabled={staffLocked}
               />
-              {staffEditTarget && (
+              {staffLocked && (
                 <p className="text-xs text-muted-foreground">
-                  Nama posisi tidak dapat diubah. Hapus baris jika ingin mengganti posisi.
+                  Posisi sudah permanen dari bulan sebelumnya. Hanya nominal gaji yang dapat diperbarui.
                 </p>
               )}
             </div>
@@ -826,13 +826,8 @@ export default function Collectors() {
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
                 placeholder="Contoh: Budi Santoso"
-                disabled={!!staffEditTarget}
+                disabled={staffLocked}
               />
-              {staffEditTarget && (
-                <p className="text-xs text-muted-foreground">
-                  Nama karyawan tidak dapat diubah. Hanya nominal gaji yang dapat diperbarui.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -843,7 +838,7 @@ export default function Collectors() {
                 placeholder="Rp 0"
               />
               <p className="text-xs text-muted-foreground">
-                Otomatis dihitung sebagai Gaji karyawan di Dashboard.
+                Otomatis dihitung sebagai Gaji karyawan di Dashboard. Posisi & nama akan tetap muncul di bulan-bulan berikutnya — Anda cukup mengisi nominal.
               </p>
             </div>
           </div>
