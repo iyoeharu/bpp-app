@@ -111,6 +111,7 @@ const fetchOmsetDetails = async (
       dp,
       omset,
       profit,
+      products: productsMap.get(c.id) || [],
     });
 
     const key = c.sales_agent_id || 'none';
