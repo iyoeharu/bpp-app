@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Pencil, Trash2, Eye, Printer, Check, ChevronsUpDown, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import useStoreOptions from "@/hooks/useStoreOptions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -141,6 +142,8 @@ export default function Contracts() {
   const [customerOpen, setCustomerOpen] = useState(false);
   const [salesAgentOpen, setSalesAgentOpen] = useState(false);
   const [collectorOpen, setCollectorOpen] = useState(false);
+  const [productStorePopoverOpen, setProductStorePopoverOpen] = useState(false);
+  const { data: storeOptions = [] } = useStoreOptions();
   
   const [formData, setFormData] = useState({
     contract_ref: "",
@@ -1568,11 +1571,63 @@ export default function Contracts() {
                       </div>
                       <div className="md:col-span-2">
                         <Label className="text-xs">Toko</Label>
-                        <Input
-                          value={newProduct.store}
-                          onChange={(e) => setNewProduct({ ...newProduct, store: e.target.value })}
-                          placeholder="Nama toko"
-                        />
+                        <Popover open={productStorePopoverOpen} onOpenChange={setProductStorePopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={productStorePopoverOpen}
+                              className="w-full justify-between font-normal"
+                            >
+                              <span className={cn("truncate", !newProduct.store && "text-muted-foreground")}>
+                                {newProduct.store || "Pilih atau ketik nama toko..."}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <Command
+                              filter={(value, search) =>
+                                value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                              }
+                            >
+                              <CommandInput
+                                placeholder="Cari atau ketik toko baru..."
+                                value={newProduct.store}
+                                onValueChange={(v) => setNewProduct({ ...newProduct, store: v })}
+                              />
+                              <CommandList>
+                                <CommandEmpty>
+                                  <div className="text-xs text-muted-foreground py-1">
+                                    Tekan Enter untuk pakai "{newProduct.store}" sebagai toko baru.
+                                  </div>
+                                </CommandEmpty>
+                                <CommandGroup heading="Toko tersedia">
+                                  {storeOptions.map((s) => (
+                                    <CommandItem
+                                      key={s}
+                                      value={s}
+                                      onSelect={(val) => {
+                                        setNewProduct((p) => ({ ...p, store: val }));
+                                        setProductStorePopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          newProduct.store.trim().toLowerCase() === s.toLowerCase()
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      {s}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div className="md:col-span-1">
                         <Button type="button" onClick={handleAddProduct} className="w-full">
