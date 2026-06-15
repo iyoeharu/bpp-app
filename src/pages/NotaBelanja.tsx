@@ -684,9 +684,13 @@ export default function NotaBelanja() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Catat Pembayaran ke Toko</DialogTitle>
+            <DialogTitle>
+              {payDialog.readonly ? `Detail Toko – ${payDialog.store}` : "Catat Pembayaran ke Toko"}
+            </DialogTitle>
             <DialogDescription>
-              Pembayaran akan mengurangi sisa hutang. Pembayaran lebih dari hutang menghasilkan nilai negatif (lebih bayar).
+              {payDialog.readonly
+                ? "Tampilan hanya-baca berisi rincian pesanan produk dan ringkasan pembayaran untuk toko ini."
+                : "Pembayaran akan mengurangi sisa hutang. Pembayaran lebih dari hutang menghasilkan nilai negatif (lebih bayar)."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4">
