@@ -1114,6 +1114,13 @@ export default function Dashboard() {
         : `Detail Omset — Tahun ${selectedYear.getFullYear()}`}
       data={omsetDetailScope === 'monthly' ? omsetMonthly : omsetYearly}
     />
+
+    <DpDetailDialog
+      open={dpDetailOpen}
+      onOpenChange={setDpDetailOpen}
+      scope={dpDetailScope}
+      period={dpDetailScope === 'monthly' ? selectedMonth : selectedYear}
+    />
     </>
   );
 }
