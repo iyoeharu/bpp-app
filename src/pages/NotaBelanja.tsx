@@ -478,92 +478,64 @@ export default function NotaBelanja() {
                       <TableHead>Tgl Pengambilan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Harga</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Memuat...
                         </TableCell>
                       </TableRow>
                     ) : filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Belum ada data produk untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.map((r, i) => (
-                        <TableRow key={r.id}>
-                          <TableCell>{i + 1}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {r.credit_contracts?.contract_ref || "-"}
-                          </TableCell>
-                          <TableCell>{r.credit_contracts?.customers?.name || "-"}</TableCell>
-                          <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell>{r.store || "-"}</TableCell>
-                          <TableCell>
-                            {editPickup?.id === r.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="date"
-                                  value={editPickup.value}
-                                  onChange={(e) => setEditPickup({ id: r.id, value: e.target.value })}
-                                  className="h-8 w-36"
-                                />
+                      filtered.map((r, i) => {
+                        const pickupDate = r.pickup_date || r.credit_contracts?.start_date || null;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell>{i + 1}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {r.credit_contracts?.contract_ref || "-"}
+                            </TableCell>
+                            <TableCell>{r.credit_contracts?.customers?.name || "-"}</TableCell>
+                            <TableCell className="font-medium">{r.name}</TableCell>
+                            <TableCell>{r.store || "-"}</TableCell>
+                            <TableCell className="text-sm">
+                              {pickupDate ? (
+                                formatDate(pickupDate)
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={r.status === "hutang" ? "destructive" : "secondary"}>
+                                {r.status === "hutang" ? "Hutang" : "Cash"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatRupiah(r.price || 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {r.status === "hutang" && r.store ? (
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    updatePickup.mutate({
-                                      id: r.id,
-                                      pickup_date: editPickup.value || null,
-                                    })
-                                  }
+                                  onClick={() => openPayDialog(r.store as string, Number(r.price || 0))}
                                 >
-                                  OK
+                                  <Plus className="h-3 w-3 mr-1" /> Bayar
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2"
-                                  onClick={() => setEditPickup(null)}
-                                >
-                                  ✕
-                                </Button>
-                              </div>
-                            ) : (
-                              <button
-                                className="text-sm hover:underline text-left"
-                                onClick={() =>
-                                  setEditPickup({
-                                    id: r.id,
-                                    value: r.pickup_date || new Date().toISOString().split("T")[0],
-                                  })
-                                }
-                              >
-                                {r.pickup_date ? (
-                                  formatDate(r.pickup_date)
-                                ) : (
-                                  <span className="text-xs text-muted-foreground italic">
-                                    Atur tanggal
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={r.status === "hutang" ? "destructive" : "secondary"}>
-                              {r.status === "hutang" ? "Hutang" : "Cash"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatRupiah(r.price || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
