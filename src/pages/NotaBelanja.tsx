@@ -609,9 +609,10 @@ export default function NotaBelanja() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  onClick={() => openPayDialog(s.store, Math.max(s.sisa, 0))}
+                                  variant="secondary"
+                                  onClick={() => openDetailDialog(s.store)}
                                 >
-                                  <Plus className="h-3 w-3 mr-1" /> Bayar
+                                  <Search className="h-3 w-3 mr-1" /> Detail
                                 </Button>
                               </div>
                             </TableCell>
