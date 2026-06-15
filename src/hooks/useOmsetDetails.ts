@@ -62,6 +62,20 @@ const fetchOmsetDetails = async (
   if (cErr) throw cErr;
   if (aErr) throw aErr;
 
+  const contractIds = (contracts || []).map((c: any) => c.id);
+  const productsMap = new Map<string, string[]>();
+  if (contractIds.length > 0) {
+    const { data: prods } = await supabase
+      .from('contract_products' as any)
+      .select('contract_id, name, position')
+      .in('contract_id', contractIds);
+    (prods || []).forEach((p: any) => {
+      const arr = productsMap.get(p.contract_id) || [];
+      arr.push(p.name);
+      productsMap.set(p.contract_id, arr);
+    });
+  }
+
   const agentLookup = new Map<string, { name: string; code: string }>();
   (agents || []).forEach((a: any) => agentLookup.set(a.id, { name: a.name, code: a.agent_code }));
 
