@@ -106,9 +106,10 @@ export default function NotaBelanja() {
   const [statusFilter, setStatusFilter] = useState<"all" | "hutang" | "cash">("all");
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [periodDate, setPeriodDate] = useState<Date>(new Date());
-  const [payDialog, setPayDialog] = useState<{ open: boolean; store: string }>({
+  const [payDialog, setPayDialog] = useState<{ open: boolean; store: string; readonly?: boolean }>({
     open: false,
     store: "",
+    readonly: false,
   });
   const [historyDialog, setHistoryDialog] = useState<{ open: boolean; store: string }>({
     open: false,
@@ -117,7 +118,7 @@ export default function NotaBelanja() {
   const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState("");
-  const [editPickup, setEditPickup] = useState<{ id: string; value: string } | null>(null);
+  // pickup date now follows contract start_date (read-only)
   const [storePopoverOpen, setStorePopoverOpen] = useState(false);
 
   const qc = useQueryClient();
@@ -202,21 +203,6 @@ export default function NotaBelanja() {
   });
 
 
-  const updatePickup = useMutation({
-    mutationFn: async (input: { id: string; pickup_date: string | null }) => {
-      const { error } = await (supabase as any)
-        .from("contract_products")
-        .update({ pickup_date: input.pickup_date })
-        .eq("id", input.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contract_products_all"] });
-      toast.success("Tanggal pengambilan diperbarui");
-      setEditPickup(null);
-    },
-    onError: (e: any) => toast.error(e.message || "Gagal memperbarui"),
-  });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -312,8 +298,15 @@ export default function NotaBelanja() {
   }, [allRows, allPayments]);
 
   const openPayDialog = (store: string, suggested = 0) => {
-    setPayDialog({ open: true, store });
+    setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
+    setPayDate(new Date().toISOString().split("T")[0]);
+    setPayNotes("");
+  };
+
+  const openDetailDialog = (store: string) => {
+    setPayDialog({ open: true, store, readonly: true });
+    setPayAmount(0);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
   };
@@ -470,92 +463,64 @@ export default function NotaBelanja() {
                       <TableHead>Tgl Pengambilan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Harga</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Memuat...
                         </TableCell>
                       </TableRow>
                     ) : filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Belum ada data produk untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.map((r, i) => (
-                        <TableRow key={r.id}>
-                          <TableCell>{i + 1}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {r.credit_contracts?.contract_ref || "-"}
-                          </TableCell>
-                          <TableCell>{r.credit_contracts?.customers?.name || "-"}</TableCell>
-                          <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell>{r.store || "-"}</TableCell>
-                          <TableCell>
-                            {editPickup?.id === r.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="date"
-                                  value={editPickup.value}
-                                  onChange={(e) => setEditPickup({ id: r.id, value: e.target.value })}
-                                  className="h-8 w-36"
-                                />
+                      filtered.map((r, i) => {
+                        const pickupDate = r.pickup_date || r.credit_contracts?.start_date || null;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell>{i + 1}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {r.credit_contracts?.contract_ref || "-"}
+                            </TableCell>
+                            <TableCell>{r.credit_contracts?.customers?.name || "-"}</TableCell>
+                            <TableCell className="font-medium">{r.name}</TableCell>
+                            <TableCell>{r.store || "-"}</TableCell>
+                            <TableCell className="text-sm">
+                              {pickupDate ? (
+                                formatDate(pickupDate)
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={r.status === "hutang" ? "destructive" : "secondary"}>
+                                {r.status === "hutang" ? "Hutang" : "Cash"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatRupiah(r.price || 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {r.status === "hutang" && r.store ? (
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    updatePickup.mutate({
-                                      id: r.id,
-                                      pickup_date: editPickup.value || null,
-                                    })
-                                  }
+                                  onClick={() => openPayDialog(r.store as string, Number(r.price || 0))}
                                 >
-                                  OK
+                                  <Plus className="h-3 w-3 mr-1" /> Bayar
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2"
-                                  onClick={() => setEditPickup(null)}
-                                >
-                                  ✕
-                                </Button>
-                              </div>
-                            ) : (
-                              <button
-                                className="text-sm hover:underline text-left"
-                                onClick={() =>
-                                  setEditPickup({
-                                    id: r.id,
-                                    value: r.pickup_date || new Date().toISOString().split("T")[0],
-                                  })
-                                }
-                              >
-                                {r.pickup_date ? (
-                                  formatDate(r.pickup_date)
-                                ) : (
-                                  <span className="text-xs text-muted-foreground italic">
-                                    Atur tanggal
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={r.status === "hutang" ? "destructive" : "secondary"}>
-                              {r.status === "hutang" ? "Hutang" : "Cash"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatRupiah(r.price || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -629,9 +594,10 @@ export default function NotaBelanja() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  onClick={() => openPayDialog(s.store, Math.max(s.sisa, 0))}
+                                  variant="secondary"
+                                  onClick={() => openDetailDialog(s.store)}
                                 >
-                                  <Plus className="h-3 w-3 mr-1" /> Bayar
+                                  <Search className="h-3 w-3 mr-1" /> Detail
                                 </Button>
                               </div>
                             </TableCell>
@@ -703,71 +669,81 @@ export default function NotaBelanja() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Catat Pembayaran ke Toko</DialogTitle>
+            <DialogTitle>
+              {payDialog.readonly ? `Detail Toko – ${payDialog.store}` : "Catat Pembayaran ke Toko"}
+            </DialogTitle>
             <DialogDescription>
-              Pembayaran akan mengurangi sisa hutang. Pembayaran lebih dari hutang menghasilkan nilai negatif (lebih bayar).
+              {payDialog.readonly
+                ? "Tampilan hanya-baca berisi rincian pesanan produk dan ringkasan pembayaran untuk toko ini."
+                : "Pembayaran akan mengurangi sisa hutang. Pembayaran lebih dari hutang menghasilkan nilai negatif (lebih bayar)."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4">
             <div>
-              <Label>Nama Toko *</Label>
-              <Popover open={storePopoverOpen} onOpenChange={setStorePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={storePopoverOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    <span className={cn("truncate", !payDialog.store && "text-muted-foreground")}>
-                      {payDialog.store || "Pilih atau ketik nama toko..."}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command
-                    filter={(value, search) =>
-                      value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-                    }
-                  >
-                    <CommandInput
-                      placeholder="Cari atau ketik toko baru..."
-                      value={payDialog.store}
-                      onValueChange={(v) => setPayDialog((d) => ({ ...d, store: v }))}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        <div className="text-xs text-muted-foreground py-1">
-                          Tekan Enter untuk pakai "{payDialog.store}" sebagai toko baru.
-                        </div>
-                      </CommandEmpty>
-                      <CommandGroup heading="Toko tersedia">
-                        {storeOptions.map((s) => (
-                          <CommandItem
-                            key={s}
-                            value={s}
-                            onSelect={(val) => {
-                              setPayDialog((d) => ({ ...d, store: val }));
-                              setStorePopoverOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                payDialog.store.trim().toLowerCase() === s.toLowerCase()
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            {s}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Label>Nama Toko {payDialog.readonly ? "" : "*"}</Label>
+              {payDialog.readonly ? (
+                <div className="w-full rounded-md border bg-muted px-3 py-2 text-sm font-medium">
+                  {payDialog.store || "-"}
+                </div>
+              ) : (
+                <Popover open={storePopoverOpen} onOpenChange={setStorePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={storePopoverOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className={cn("truncate", !payDialog.store && "text-muted-foreground")}>
+                        {payDialog.store || "Pilih atau ketik nama toko..."}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command
+                      filter={(value, search) =>
+                        value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                      }
+                    >
+                      <CommandInput
+                        placeholder="Cari atau ketik toko baru..."
+                        value={payDialog.store}
+                        onValueChange={(v) => setPayDialog((d) => ({ ...d, store: v }))}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="text-xs text-muted-foreground py-1">
+                            Tekan Enter untuk pakai "{payDialog.store}" sebagai toko baru.
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup heading="Toko tersedia">
+                          {storeOptions.map((s) => (
+                            <CommandItem
+                              key={s}
+                              value={s}
+                              onSelect={(val) => {
+                                setPayDialog((d) => ({ ...d, store: val }));
+                                setStorePopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  payDialog.store.trim().toLowerCase() === s.toLowerCase()
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {s}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
             {/* Pesanan produk untuk toko ini */}
@@ -839,41 +815,50 @@ export default function NotaBelanja() {
               </div>
             )}
 
-            <div>
-              <Label>Tanggal Pembayaran *</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Jumlah Pembayaran *</Label>
-              <CurrencyInput value={payAmount} onValueChange={(v) => setPayAmount(v || 0)} />
-            </div>
-            <div>
-              <Label>Catatan</Label>
-              <Textarea
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-                placeholder="Opsional"
-                rows={2}
-              />
-            </div>
+            {!payDialog.readonly && (
+              <>
+                <div>
+                  <Label>Tanggal Pembayaran *</Label>
+                  <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Jumlah Pembayaran *</Label>
+                  <CurrencyInput value={payAmount} onValueChange={(v) => setPayAmount(v || 0)} />
+                </div>
+                <div>
+                  <Label>Catatan</Label>
+                  <Textarea
+                    value={payNotes}
+                    onChange={(e) => setPayNotes(e.target.value)}
+                    placeholder="Opsional"
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayDialog({ open: false, store: "" })}>
-              Batal
-            </Button>
             <Button
-              disabled={!payDialog.store.trim() || payAmount <= 0 || createPayment.isPending}
-              onClick={() =>
-                createPayment.mutate({
-                  store: payDialog.store.trim(),
-                  amount: payAmount,
-                  payment_date: payDate,
-                  notes: payNotes.trim(),
-                })
-              }
+              variant="outline"
+              onClick={() => setPayDialog({ open: false, store: "", readonly: false })}
             >
-              {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
+              {payDialog.readonly ? "Tutup" : "Batal"}
             </Button>
+            {!payDialog.readonly && (
+              <Button
+                disabled={!payDialog.store.trim() || payAmount <= 0 || createPayment.isPending}
+                onClick={() =>
+                  createPayment.mutate({
+                    store: payDialog.store.trim(),
+                    amount: payAmount,
+                    payment_date: payDate,
+                    notes: payNotes.trim(),
+                  })
+                }
+              >
+                {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
