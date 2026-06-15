@@ -783,7 +783,11 @@ export default function NotaBelanja() {
                               {p.credit_contracts?.contract_ref || "-"}
                             </TableCell>
                             <TableCell className="py-1.5 text-xs">
-                              {p.pickup_date ? formatDate(p.pickup_date) : "-"}
+                              {p.pickup_date
+                                ? formatDate(p.pickup_date)
+                                : p.credit_contracts?.start_date
+                                ? formatDate(p.credit_contracts.start_date)
+                                : "-"}
                             </TableCell>
                             <TableCell className="py-1.5 text-xs text-right">
                               {formatRupiah(Number(p.price || 0))}
