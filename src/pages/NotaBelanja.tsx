@@ -106,9 +106,10 @@ export default function NotaBelanja() {
   const [statusFilter, setStatusFilter] = useState<"all" | "hutang" | "cash">("all");
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [periodDate, setPeriodDate] = useState<Date>(new Date());
-  const [payDialog, setPayDialog] = useState<{ open: boolean; store: string }>({
+  const [payDialog, setPayDialog] = useState<{ open: boolean; store: string; readonly?: boolean }>({
     open: false,
     store: "",
+    readonly: false,
   });
   const [historyDialog, setHistoryDialog] = useState<{ open: boolean; store: string }>({
     open: false,
