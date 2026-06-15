@@ -25,6 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import {
@@ -38,7 +45,24 @@ import {
   Plus,
   History,
   Trash2,
+  ArrowLeft,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  addMonths,
+  subMonths,
+  addYears,
+  subYears,
+  isWithinInterval,
+  parseISO,
+} from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 
 interface NotaProductRow {
   id: string;
@@ -48,6 +72,7 @@ interface NotaProductRow {
   price: number;
   status: "hutang" | "cash";
   store: string | null;
+  pickup_date: string | null;
   created_at: string;
   credit_contracts: {
     contract_ref: string;
@@ -68,6 +93,8 @@ interface NotaPayment {
 export default function NotaBelanja() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "hutang" | "cash">("all");
+  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [periodDate, setPeriodDate] = useState<Date>(new Date());
   const [payDialog, setPayDialog] = useState<{ open: boolean; store: string }>({
     open: false,
     store: "",
@@ -79,16 +106,38 @@ export default function NotaBelanja() {
   const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState("");
+  const [editPickup, setEditPickup] = useState<{ id: string; value: string } | null>(null);
 
   const qc = useQueryClient();
 
-  const { data: rows = [], isLoading } = useQuery({
+  const periodRange = useMemo(() => {
+    if (period === "yearly") {
+      return { start: startOfYear(periodDate), end: endOfYear(periodDate) };
+    }
+    return { start: startOfMonth(periodDate), end: endOfMonth(periodDate) };
+  }, [period, periodDate]);
+
+  const periodLabel = useMemo(() => {
+    return period === "yearly"
+      ? `Tahun ${periodDate.getFullYear()}`
+      : format(periodDate, "MMMM yyyy", { locale: idLocale });
+  }, [period, periodDate]);
+
+  const shiftPeriod = (delta: number) => {
+    if (period === "yearly") {
+      setPeriodDate((d) => (delta > 0 ? addYears(d, 1) : subYears(d, 1)));
+    } else {
+      setPeriodDate((d) => (delta > 0 ? addMonths(d, 1) : subMonths(d, 1)));
+    }
+  };
+
+  const { data: allRows = [], isLoading } = useQuery({
     queryKey: ["contract_products_all"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("contract_products")
         .select(
-          "id, contract_id, position, name, price, status, store, created_at, credit_contracts(contract_ref, start_date, customers(name))"
+          "id, contract_id, position, name, price, status, store, pickup_date, created_at, credit_contracts(contract_ref, start_date, customers(name))"
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -96,7 +145,7 @@ export default function NotaBelanja() {
     },
   });
 
-  const { data: payments = [] } = useQuery({
+  const { data: allPayments = [] } = useQuery({
     queryKey: ["nota_payments"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -107,6 +156,23 @@ export default function NotaBelanja() {
       return (data || []) as NotaPayment[];
     },
   });
+
+  // Filter rows & payments by period
+  const rows = useMemo(() => {
+    return allRows.filter((r) => {
+      const d = r.created_at ? parseISO(r.created_at) : null;
+      if (!d) return false;
+      return isWithinInterval(d, periodRange);
+    });
+  }, [allRows, periodRange]);
+
+  const payments = useMemo(() => {
+    return allPayments.filter((p) => {
+      const d = p.payment_date ? parseISO(p.payment_date) : null;
+      if (!d) return false;
+      return isWithinInterval(d, periodRange);
+    });
+  }, [allPayments, periodRange]);
 
   const createPayment = useMutation({
     mutationFn: async (input: { store: string; amount: number; payment_date: string; notes: string }) => {
@@ -134,6 +200,22 @@ export default function NotaBelanja() {
     },
   });
 
+  const updatePickup = useMutation({
+    mutationFn: async (input: { id: string; pickup_date: string | null }) => {
+      const { error } = await (supabase as any)
+        .from("contract_products")
+        .update({ pickup_date: input.pickup_date })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contract_products_all"] });
+      toast.success("Tanggal pengambilan diperbarui");
+      setEditPickup(null);
+    },
+    onError: (e: any) => toast.error(e.message || "Gagal memperbarui"),
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -148,7 +230,6 @@ export default function NotaBelanja() {
     });
   }, [rows, search, statusFilter]);
 
-  // Per-store payment totals
   const paidByStore = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of payments) m.set(p.store, (m.get(p.store) || 0) + Number(p.amount || 0));
@@ -167,7 +248,7 @@ export default function NotaBelanja() {
       if (r.store) stores.add(r.store);
     }
     const paidTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const sisa = hutang - paidTotal; // bisa negatif (lebih bayar)
+    const sisa = hutang - paidTotal;
     return { cash, hutang, items, stores: stores.size, total: cash + hutang, paidTotal, sisa };
   }, [rows, payments]);
 
@@ -184,7 +265,6 @@ export default function NotaBelanja() {
       cur.items += 1;
       map.set(key, cur);
     }
-    // include stores that only appear in payments
     for (const s of paidByStore.keys()) {
       if (!map.has(s)) map.set(s, { store: s, cash: 0, hutang: 0, items: 0 });
     }
@@ -201,6 +281,21 @@ export default function NotaBelanja() {
     [payments, historyDialog.store]
   );
 
+  // Pesanan produk untuk toko yang sedang dibayar (status hutang dalam periode)
+  const dialogStoreProducts = useMemo(() => {
+    if (!payDialog.store) return [] as NotaProductRow[];
+    const target = payDialog.store.trim().toLowerCase();
+    return rows.filter(
+      (r) => r.status === "hutang" && (r.store || "").trim().toLowerCase() === target
+    );
+  }, [rows, payDialog.store]);
+
+  const dialogStoreTotals = useMemo(() => {
+    const hutang = dialogStoreProducts.reduce((s, r) => s + Number(r.price || 0), 0);
+    const paid = paidByStore.get(payDialog.store.trim()) || 0;
+    return { hutang, paid, sisa: hutang - paid };
+  }, [dialogStoreProducts, paidByStore, payDialog.store]);
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store });
     setPayAmount(suggested);
@@ -213,13 +308,38 @@ export default function NotaBelanja() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Receipt className="h-7 w-7 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold">Nota Belanja</h1>
-          <p className="text-sm text-muted-foreground">
-            Rincian total harga produk berdasarkan status invoice (hutang) dan cash, beserta pembayaran ke toko.
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Receipt className="h-7 w-7 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Nota Belanja</h1>
+            <p className="text-sm text-muted-foreground">
+              Rincian total harga produk berdasarkan status invoice (hutang) dan cash, beserta pembayaran ke toko.
+            </p>
+          </div>
+        </div>
+
+        {/* Period selector */}
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monthly">Bulanan</SelectItem>
+              <SelectItem value="yearly">Tahunan</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" onClick={() => shiftPeriod(-1)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md min-w-[140px] justify-center">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">{periodLabel}</span>
+          </div>
+          <Button variant="outline" size="icon" onClick={() => shiftPeriod(1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -232,7 +352,7 @@ export default function NotaBelanja() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatRupiah(totals.total)}</div>
-            <p className="text-xs text-muted-foreground">{totals.items} item produk</p>
+            <p className="text-xs text-muted-foreground">{totals.items} item · {periodLabel}</p>
           </CardContent>
         </Card>
         <Card>
@@ -332,6 +452,7 @@ export default function NotaBelanja() {
                       <TableHead>Pelanggan</TableHead>
                       <TableHead>Nama Produk</TableHead>
                       <TableHead>Toko</TableHead>
+                      <TableHead>Tgl Pengambilan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Harga</TableHead>
                     </TableRow>
@@ -339,14 +460,14 @@ export default function NotaBelanja() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           Memuat...
                         </TableCell>
                       </TableRow>
                     ) : filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          Belum ada data produk.
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          Belum ada data produk untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -359,6 +480,57 @@ export default function NotaBelanja() {
                           <TableCell>{r.credit_contracts?.customers?.name || "-"}</TableCell>
                           <TableCell className="font-medium">{r.name}</TableCell>
                           <TableCell>{r.store || "-"}</TableCell>
+                          <TableCell>
+                            {editPickup?.id === r.id ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="date"
+                                  value={editPickup.value}
+                                  onChange={(e) => setEditPickup({ id: r.id, value: e.target.value })}
+                                  className="h-8 w-36"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2"
+                                  onClick={() =>
+                                    updatePickup.mutate({
+                                      id: r.id,
+                                      pickup_date: editPickup.value || null,
+                                    })
+                                  }
+                                >
+                                  OK
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2"
+                                  onClick={() => setEditPickup(null)}
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            ) : (
+                              <button
+                                className="text-sm hover:underline text-left"
+                                onClick={() =>
+                                  setEditPickup({
+                                    id: r.id,
+                                    value: r.pickup_date || new Date().toISOString().split("T")[0],
+                                  })
+                                }
+                              >
+                                {r.pickup_date ? (
+                                  formatDate(r.pickup_date)
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    Atur tanggal
+                                  </span>
+                                )}
+                              </button>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge variant={r.status === "hutang" ? "destructive" : "secondary"}>
                               {r.status === "hutang" ? "Hutang" : "Cash"}
@@ -484,7 +656,7 @@ export default function NotaBelanja() {
                     {payments.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          Belum ada pembayaran.
+                          Belum ada pembayaran untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -526,14 +698,14 @@ export default function NotaBelanja() {
         open={payDialog.open}
         onOpenChange={(o) => setPayDialog((d) => ({ ...d, open: o }))}
       >
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Catat Pembayaran ke Toko</DialogTitle>
             <DialogDescription>
               Pembayaran akan mengurangi sisa hutang. Pembayaran lebih dari hutang menghasilkan nilai negatif (lebih bayar).
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4">
             <div>
               <Label>Nama Toko *</Label>
               <Input
@@ -542,6 +714,76 @@ export default function NotaBelanja() {
                 placeholder="cth: Toko Sumber Rejeki"
               />
             </div>
+
+            {/* Pesanan produk untuk toko ini */}
+            {payDialog.store && (
+              <div className="rounded-md border bg-muted/30">
+                <div className="px-3 py-2 border-b flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">
+                      Pesanan Produk – {payDialog.store} ({periodLabel})
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {dialogStoreProducts.length} item hutang
+                  </div>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {dialogStoreProducts.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                      Tidak ada pesanan hutang untuk toko ini di periode {periodLabel}.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="h-8">Produk</TableHead>
+                          <TableHead className="h-8">Kontrak</TableHead>
+                          <TableHead className="h-8">Tgl Ambil</TableHead>
+                          <TableHead className="h-8 text-right">Harga</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dialogStoreProducts.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
+                            <TableCell className="py-1.5 text-xs font-mono">
+                              {p.credit_contracts?.contract_ref || "-"}
+                            </TableCell>
+                            <TableCell className="py-1.5 text-xs">
+                              {p.pickup_date ? formatDate(p.pickup_date) : "-"}
+                            </TableCell>
+                            <TableCell className="py-1.5 text-xs text-right">
+                              {formatRupiah(Number(p.price || 0))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+                <div className="px-3 py-2 border-t grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Hutang</p>
+                    <p className="font-semibold text-red-600">{formatRupiah(dialogStoreTotals.hutang)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Dibayar</p>
+                    <p className="font-semibold text-blue-600">{formatRupiah(dialogStoreTotals.paid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Sisa</p>
+                    <p className={`font-semibold ${dialogStoreTotals.sisa > 0 ? "text-red-600" : dialogStoreTotals.sisa < 0 ? "text-emerald-600" : ""}`}>
+                      {dialogStoreTotals.sisa < 0
+                        ? `- ${formatRupiah(Math.abs(dialogStoreTotals.sisa))}`
+                        : formatRupiah(dialogStoreTotals.sisa)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <Label>Tanggal Pembayaran *</Label>
               <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
@@ -590,7 +832,7 @@ export default function NotaBelanja() {
           <DialogHeader>
             <DialogTitle>Riwayat Pembayaran – {historyDialog.store}</DialogTitle>
             <DialogDescription>
-              Total dibayar:{" "}
+              Total dibayar ({periodLabel}):{" "}
               <span className="font-semibold text-blue-600">
                 {formatRupiah(paidByStore.get(historyDialog.store) || 0)}
               </span>
@@ -610,7 +852,7 @@ export default function NotaBelanja() {
                 {storePayments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                      Belum ada pembayaran untuk toko ini.
+                      Belum ada pembayaran untuk toko ini di periode ini.
                     </TableCell>
                   </TableRow>
                 ) : (
