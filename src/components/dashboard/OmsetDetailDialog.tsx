@@ -1,11 +1,15 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatRupiah } from "@/lib/format";
 import type { OmsetDetailsSummary } from "@/hooks/useOmsetDetails";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Search, Info, Package } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -15,6 +19,22 @@ interface Props {
 }
 
 export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
+  const [search, setSearch] = useState("");
+
+  const filteredContracts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = data?.contracts || [];
+    if (!q) return list;
+    return list.filter((c) =>
+      (c.contract_ref || "").toLowerCase().includes(q) ||
+      (c.customer_name || "").toLowerCase().includes(q) ||
+      (c.customer_phone || "").toLowerCase().includes(q) ||
+      (c.sales_name || "").toLowerCase().includes(q) ||
+      (c.sales_code || "").toLowerCase().includes(q) ||
+      (c.products || []).some((p) => p.toLowerCase().includes(q))
+    );
+  }, [data?.contracts, search]);
+
   const totalKonsumen = useMemo(() => {
     if (!data?.contracts) return 0;
     const set = new Set<string>();
@@ -26,6 +46,7 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
     });
     return set.size;
   }, [data?.contracts]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col overflow-hidden">
@@ -62,7 +83,18 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold mb-2">Detail Kontrak (urut omset terbesar)</h3>
+            <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+              <h3 className="text-sm font-semibold">Detail Kontrak ({filteredContracts.length})</h3>
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari kontrak, pelanggan, sales, produk..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+            </div>
             <div className="rounded-md border max-h-[400px] overflow-y-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
@@ -74,13 +106,13 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
                     <TableHead className="text-right">Modal</TableHead>
                     <TableHead className="text-right">DP</TableHead>
                     <TableHead className="text-right">Omset</TableHead>
-                    <TableHead>Product</TableHead>
+                    <TableHead className="text-center">Info</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(data?.contracts || []).length === 0 ? (
+                  {filteredContracts.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Tidak ada kontrak</TableCell></TableRow>
-                  ) : data!.contracts.map((c) => (
+                  ) : filteredContracts.map((c) => (
                     <TableRow key={c.contract_id}>
                       <TableCell className="whitespace-nowrap">{format(new Date(c.start_date), 'dd MMM yyyy', { locale: idLocale })}</TableCell>
                       <TableCell className="font-mono text-xs">{c.contract_ref}</TableCell>
@@ -94,16 +126,37 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
                       <TableCell className="text-right text-blue-600">{formatRupiah(c.modal)}</TableCell>
                       <TableCell className="text-right text-orange-600">{formatRupiah(c.dp ?? 0)}</TableCell>
                       <TableCell className="text-right text-indigo-600">{formatRupiah(c.omset)}</TableCell>
-                      <TableCell>
-                        {c.products && c.products.length > 0 ? (
-                          <div className="text-xs text-muted-foreground space-y-0.5">
-                            {c.products.map((p, i) => (
-                              <div key={i}>{p}</div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
+                      <TableCell className="text-center">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2"
+                              disabled={!c.products || c.products.length === 0}
+                            >
+                              <Info className="h-4 w-4 text-primary" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-64">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Package className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-semibold">Produk Kontrak</span>
+                            </div>
+                            {c.products && c.products.length > 0 ? (
+                              <ul className="space-y-1 text-sm">
+                                {c.products.map((p, i) => (
+                                  <li key={i} className="flex gap-2">
+                                    <span className="text-muted-foreground">{i + 1}.</span>
+                                    <span>{p}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Tidak ada produk</p>
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       </TableCell>
                     </TableRow>
                   ))}

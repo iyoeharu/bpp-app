@@ -51,6 +51,7 @@ import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDet
 import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
 import { MacetDetailDialog } from "@/components/dashboard/MacetDetailDialog";
 import { OmsetDetailDialog } from "@/components/dashboard/OmsetDetailDialog";
+import { DpDetailDialog } from "@/components/dashboard/DpDetailDialog";
 import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hooks/useOutstandingDetails";
 import { useOmsetDetailsMonthly, useOmsetDetailsYearly } from "@/hooks/useOmsetDetails";
 import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from "@/hooks/useCollectorSalaries";
@@ -71,6 +72,8 @@ export default function Dashboard() {
   const [macetDetailScope, setMacetDetailScope] = useState<'monthly' | 'yearly'>('monthly');
   const [omsetDetailOpen, setOmsetDetailOpen] = useState(false);
   const [omsetDetailScope, setOmsetDetailScope] = useState<'monthly' | 'yearly'>('monthly');
+  const [dpDetailOpen, setDpDetailOpen] = useState(false);
+  const [dpDetailScope, setDpDetailScope] = useState<'monthly' | 'yearly'>('monthly');
   const [newExpense, setNewExpense] = useState<OperationalExpenseInput>({
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
@@ -319,6 +322,7 @@ export default function Dashboard() {
           valueColor="text-amber-600"
           subtitle={`${dpMonthly?.contract_count ?? 0} kontrak ada DP`}
           hoverInfo="Total Down Payment (DP) dari kontrak baru bulan ini. Dihitung dari pembayaran pertama setiap kontrak yang dibuat bulan ini."
+          onDetailClick={() => { setDpDetailScope('monthly'); setDpDetailOpen(true); }}
         />
 
         <StatCard
@@ -723,6 +727,7 @@ export default function Dashboard() {
                   valueColor="text-amber-600"
                   subtitle={`${dpYearly?.contract_count ?? 0} kontrak ada DP`}
                   hoverInfo={`Total Down Payment (DP) dari kontrak yang dibuat tahun ${selectedYear.getFullYear()}. Dihitung dari pembayaran pertama setiap kontrak.`}
+                  onDetailClick={() => { setDpDetailScope('yearly'); setDpDetailOpen(true); }}
                 />
 
                 <StatCard
@@ -1108,6 +1113,13 @@ export default function Dashboard() {
         ? `Detail Omset — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
         : `Detail Omset — Tahun ${selectedYear.getFullYear()}`}
       data={omsetDetailScope === 'monthly' ? omsetMonthly : omsetYearly}
+    />
+
+    <DpDetailDialog
+      open={dpDetailOpen}
+      onOpenChange={setDpDetailOpen}
+      scope={dpDetailScope}
+      period={dpDetailScope === 'monthly' ? selectedMonth : selectedYear}
     />
     </>
   );
