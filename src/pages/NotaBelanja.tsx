@@ -830,41 +830,50 @@ export default function NotaBelanja() {
               </div>
             )}
 
-            <div>
-              <Label>Tanggal Pembayaran *</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Jumlah Pembayaran *</Label>
-              <CurrencyInput value={payAmount} onValueChange={(v) => setPayAmount(v || 0)} />
-            </div>
-            <div>
-              <Label>Catatan</Label>
-              <Textarea
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-                placeholder="Opsional"
-                rows={2}
-              />
-            </div>
+            {!payDialog.readonly && (
+              <>
+                <div>
+                  <Label>Tanggal Pembayaran *</Label>
+                  <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Jumlah Pembayaran *</Label>
+                  <CurrencyInput value={payAmount} onValueChange={(v) => setPayAmount(v || 0)} />
+                </div>
+                <div>
+                  <Label>Catatan</Label>
+                  <Textarea
+                    value={payNotes}
+                    onChange={(e) => setPayNotes(e.target.value)}
+                    placeholder="Opsional"
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayDialog({ open: false, store: "" })}>
-              Batal
-            </Button>
             <Button
-              disabled={!payDialog.store.trim() || payAmount <= 0 || createPayment.isPending}
-              onClick={() =>
-                createPayment.mutate({
-                  store: payDialog.store.trim(),
-                  amount: payAmount,
-                  payment_date: payDate,
-                  notes: payNotes.trim(),
-                })
-              }
+              variant="outline"
+              onClick={() => setPayDialog({ open: false, store: "", readonly: false })}
             >
-              {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
+              {payDialog.readonly ? "Tutup" : "Batal"}
             </Button>
+            {!payDialog.readonly && (
+              <Button
+                disabled={!payDialog.store.trim() || payAmount <= 0 || createPayment.isPending}
+                onClick={() =>
+                  createPayment.mutate({
+                    store: payDialog.store.trim(),
+                    amount: payAmount,
+                    payment_date: payDate,
+                    notes: payNotes.trim(),
+                  })
+                }
+              >
+                {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
