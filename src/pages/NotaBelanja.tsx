@@ -200,16 +200,6 @@ export default function NotaBelanja() {
     onError: (e: any) => toast.error(e.message || "Gagal mencatat pembayaran"),
   });
 
-  const deletePayment = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("nota_payments").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["nota_payments"] });
-      toast.success("Pembayaran dihapus");
-    },
-  });
 
   const updatePickup = useMutation({
     mutationFn: async (input: { id: string; pickup_date: string | null }) => {
