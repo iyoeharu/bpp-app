@@ -298,6 +298,19 @@ export default function NotaBelanja() {
     return { hutang, paid, sisa: hutang - paid };
   }, [dialogStoreProducts, paidByStore, payDialog.store]);
 
+  const storeOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRows) {
+      const s = (r.store || "").trim();
+      if (s) set.add(s);
+    }
+    for (const p of allPayments) {
+      const s = (p.store || "").trim();
+      if (s) set.add(s);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allRows, allPayments]);
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store });
     setPayAmount(suggested);
