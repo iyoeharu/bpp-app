@@ -660,13 +660,12 @@ export default function NotaBelanja() {
                       <TableHead>Toko</TableHead>
                       <TableHead>Catatan</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
-                      <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           Belum ada pembayaran untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
@@ -681,17 +680,6 @@ export default function NotaBelanja() {
                           </TableCell>
                           <TableCell className="text-right font-semibold text-blue-600">
                             {formatRupiah(Number(p.amount))}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                if (confirm("Hapus pembayaran ini?")) deletePayment.mutate(p.id);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3 text-red-600" />
-                            </Button>
                           </TableCell>
                         </TableRow>
                       ))
