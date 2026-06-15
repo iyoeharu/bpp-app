@@ -203,21 +203,6 @@ export default function NotaBelanja() {
   });
 
 
-  const updatePickup = useMutation({
-    mutationFn: async (input: { id: string; pickup_date: string | null }) => {
-      const { error } = await (supabase as any)
-        .from("contract_products")
-        .update({ pickup_date: input.pickup_date })
-        .eq("id", input.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contract_products_all"] });
-      toast.success("Tanggal pengambilan diperbarui");
-      setEditPickup(null);
-    },
-    onError: (e: any) => toast.error(e.message || "Gagal memperbarui"),
-  });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
