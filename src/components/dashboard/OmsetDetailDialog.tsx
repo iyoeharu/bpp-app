@@ -74,7 +74,7 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
                     <TableHead className="text-right">Modal</TableHead>
                     <TableHead className="text-right">DP</TableHead>
                     <TableHead className="text-right">Omset</TableHead>
-                    <TableHead className="text-right">Keuntungan</TableHead>
+                    <TableHead>Product</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -94,7 +94,17 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
                       <TableCell className="text-right text-blue-600">{formatRupiah(c.modal)}</TableCell>
                       <TableCell className="text-right text-orange-600">{formatRupiah(c.dp ?? 0)}</TableCell>
                       <TableCell className="text-right text-indigo-600">{formatRupiah(c.omset)}</TableCell>
-                      <TableCell className="text-right text-green-600 font-semibold">{formatRupiah(c.profit)}</TableCell>
+                      <TableCell>
+                        {c.products && c.products.length > 0 ? (
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {c.products.map((p, i) => (
+                              <div key={i}>{p}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
