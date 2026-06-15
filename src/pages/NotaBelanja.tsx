@@ -313,8 +313,15 @@ export default function NotaBelanja() {
   }, [allRows, allPayments]);
 
   const openPayDialog = (store: string, suggested = 0) => {
-    setPayDialog({ open: true, store });
+    setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
+    setPayDate(new Date().toISOString().split("T")[0]);
+    setPayNotes("");
+  };
+
+  const openDetailDialog = (store: string) => {
+    setPayDialog({ open: true, store, readonly: true });
+    setPayAmount(0);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
   };
