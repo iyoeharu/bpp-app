@@ -470,6 +470,14 @@ export default function Contracts() {
       toast.error("Modal awal harus diisi dan lebih dari 0");
       return;
     }
+
+    // Validasi total harga produk harus sama dengan modal awal
+    const totalProductsPrice = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    if (totalProductsPrice !== (Number(formData.modal) || 0)) {
+      toast.error(`Total harga produk (${formatRupiah(totalProductsPrice)}) harus sama dengan Modal Awal (${formatRupiah(formData.modal || 0)})`);
+      return;
+    }
+    
     
     // Validation for new contracts (CREATE only)
     if (!selectedContract) {
