@@ -695,64 +695,70 @@ export default function NotaBelanja() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4">
             <div>
-              <Label>Nama Toko *</Label>
-              <Popover open={storePopoverOpen} onOpenChange={setStorePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={storePopoverOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    <span className={cn("truncate", !payDialog.store && "text-muted-foreground")}>
-                      {payDialog.store || "Pilih atau ketik nama toko..."}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command
-                    filter={(value, search) =>
-                      value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-                    }
-                  >
-                    <CommandInput
-                      placeholder="Cari atau ketik toko baru..."
-                      value={payDialog.store}
-                      onValueChange={(v) => setPayDialog((d) => ({ ...d, store: v }))}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        <div className="text-xs text-muted-foreground py-1">
-                          Tekan Enter untuk pakai "{payDialog.store}" sebagai toko baru.
-                        </div>
-                      </CommandEmpty>
-                      <CommandGroup heading="Toko tersedia">
-                        {storeOptions.map((s) => (
-                          <CommandItem
-                            key={s}
-                            value={s}
-                            onSelect={(val) => {
-                              setPayDialog((d) => ({ ...d, store: val }));
-                              setStorePopoverOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                payDialog.store.trim().toLowerCase() === s.toLowerCase()
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            {s}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Label>Nama Toko {payDialog.readonly ? "" : "*"}</Label>
+              {payDialog.readonly ? (
+                <div className="w-full rounded-md border bg-muted px-3 py-2 text-sm font-medium">
+                  {payDialog.store || "-"}
+                </div>
+              ) : (
+                <Popover open={storePopoverOpen} onOpenChange={setStorePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={storePopoverOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className={cn("truncate", !payDialog.store && "text-muted-foreground")}>
+                        {payDialog.store || "Pilih atau ketik nama toko..."}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command
+                      filter={(value, search) =>
+                        value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                      }
+                    >
+                      <CommandInput
+                        placeholder="Cari atau ketik toko baru..."
+                        value={payDialog.store}
+                        onValueChange={(v) => setPayDialog((d) => ({ ...d, store: v }))}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="text-xs text-muted-foreground py-1">
+                            Tekan Enter untuk pakai "{payDialog.store}" sebagai toko baru.
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup heading="Toko tersedia">
+                          {storeOptions.map((s) => (
+                            <CommandItem
+                              key={s}
+                              value={s}
+                              onSelect={(val) => {
+                                setPayDialog((d) => ({ ...d, store: val }));
+                                setStorePopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  payDialog.store.trim().toLowerCase() === s.toLowerCase()
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {s}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
             {/* Pesanan produk untuk toko ini */}
