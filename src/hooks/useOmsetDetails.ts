@@ -15,6 +15,7 @@ export interface OmsetContractDetail {
   dp: number;
   omset: number;
   profit: number;
+  products: string[];
 }
 
 export interface OmsetBySales {
