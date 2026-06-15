@@ -118,6 +118,7 @@ export default function NotaBelanja() {
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState("");
   const [editPickup, setEditPickup] = useState<{ id: string; value: string } | null>(null);
+  const [storePopoverOpen, setStorePopoverOpen] = useState(false);
 
   const qc = useQueryClient();
 
