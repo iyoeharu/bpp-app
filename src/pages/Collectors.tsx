@@ -310,6 +310,7 @@ export default function Collectors() {
         const note = await promptAdminNote({
           title: "Catatan Pembaruan Kolektor",
           description: `Tuliskan alasan perubahan data kolektor ${selectedCollector.name}.`,
+          requirePassword: true,
         });
         if (!note) return;
         const updated = await updateCollector.mutateAsync({
