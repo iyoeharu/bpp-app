@@ -214,6 +214,7 @@ export default function Customers() {
         const note = await promptAdminNote({
           title: "Catatan Pembaruan Customer",
           description: `Tuliskan alasan perubahan data customer ${selectedCustomer.name}.`,
+          requirePassword: true,
         });
         if (!note) return;
         await updateCustomer.mutateAsync({ id: selectedCustomer.id, ...submitData, _note: note } as any);
