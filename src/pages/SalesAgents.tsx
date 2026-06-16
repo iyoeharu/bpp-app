@@ -387,6 +387,7 @@ export default function SalesAgents() {
         const note = await promptAdminNote({
           title: "Catatan Pembaruan Sales",
           description: `Tuliskan alasan perubahan data sales ${selectedAgent.name}.`,
+          requirePassword: true,
         });
         if (!note) return;
         await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData, _note: note } as any);
