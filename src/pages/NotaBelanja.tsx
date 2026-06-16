@@ -486,11 +486,19 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.map((r, i) => {
+                      filtered.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          Belum ada data produk untuk {periodLabel}.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      productPagination.paginatedItems.map((r, i) => {
                         const pickupDate = r.pickup_date || null;
+                        const globalIdx = (productPagination.currentPage - 1) * 10 + i + 1;
                         return (
                           <TableRow key={r.id}>
-                            <TableCell>{i + 1}</TableCell>
+                            <TableCell>{globalIdx}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {r.credit_contracts?.contract_ref || "-"}
                             </TableCell>
@@ -531,6 +539,12 @@ export default function NotaBelanja() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={productPagination.currentPage}
+                totalPages={productPagination.totalPages}
+                onPageChange={productPagination.goToPage}
+                totalItems={productPagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
