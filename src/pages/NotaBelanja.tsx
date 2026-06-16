@@ -577,9 +577,10 @@ export default function NotaBelanja() {
                             : s.sisa < 0
                               ? "text-emerald-600"
                               : "text-muted-foreground";
+                        const globalIdx = (storePagination.currentPage - 1) * 10 + i + 1;
                         return (
                           <TableRow key={s.store}>
-                            <TableCell>{i + 1}</TableCell>
+                            <TableCell>{globalIdx}</TableCell>
                             <TableCell className="font-medium">{s.store}</TableCell>
                             <TableCell className="text-right">{s.items}</TableCell>
                             <TableCell className="text-right text-green-600">
