@@ -486,13 +486,6 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          Belum ada data produk untuk {periodLabel}.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
                       productPagination.paginatedItems.map((r, i) => {
                         const pickupDate = r.pickup_date || null;
                         const globalIdx = (productPagination.currentPage - 1) * 10 + i + 1;
