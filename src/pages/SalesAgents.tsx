@@ -965,6 +965,7 @@ export default function SalesAgents() {
                           const note = await promptAdminNote({
                             title: willDeactivate ? "Catatan Nonaktifkan Sales" : "Catatan Aktifkan Sales",
                             description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} sales ${agent.name}.`,
+                            requirePassword: true,
                           });
                           if (!note) return;
                           updateAgent.mutate({ id: agent.id, is_active: !willDeactivate, _note: note } as any);
