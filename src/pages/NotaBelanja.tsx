@@ -660,23 +660,32 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      payments.map((p, i) => (
-                        <TableRow key={p.id}>
-                          <TableCell>{i + 1}</TableCell>
-                          <TableCell>{formatDate(p.payment_date)}</TableCell>
-                          <TableCell className="font-medium">{p.store}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {p.notes || "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-blue-600">
-                            {formatRupiah(Number(p.amount))}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      paymentPagination.paginatedItems.map((p, i) => {
+                        const globalIdx = (paymentPagination.currentPage - 1) * 10 + i + 1;
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell>{globalIdx}</TableCell>
+                            <TableCell>{formatDate(p.payment_date)}</TableCell>
+                            <TableCell className="font-medium">{p.store}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {p.notes || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-blue-600">
+                              {formatRupiah(Number(p.amount))}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={paymentPagination.currentPage}
+                totalPages={paymentPagination.totalPages}
+                onPageChange={paymentPagination.goToPage}
+                totalItems={paymentPagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
