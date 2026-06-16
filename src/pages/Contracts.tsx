@@ -1568,7 +1568,7 @@ export default function Contracts() {
 
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-3">
                         <Label className="text-xs">Nama Barang</Label>
                         <Input
                           value={newProduct.name}
@@ -1576,7 +1576,7 @@ export default function Contracts() {
                           placeholder="Contoh: Kulkas"
                         />
                       </div>
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <Label className="text-xs">Harga</Label>
                         <CurrencyInput
                           value={newProduct.price}
@@ -1610,7 +1610,7 @@ export default function Contracts() {
                               className="w-full justify-between font-normal"
                             >
                               <span className={cn("truncate", !newProduct.store && "text-muted-foreground")}>
-                                {newProduct.store || "Pilih atau ketik nama toko..."}
+                                {newProduct.store || "Pilih toko..."}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -1659,12 +1659,21 @@ export default function Contracts() {
                           </PopoverContent>
                         </Popover>
                       </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Tgl Ambil</Label>
+                        <Input
+                          type="date"
+                          value={newProduct.pickup_date || ''}
+                          onChange={(e) => setNewProduct({ ...newProduct, pickup_date: e.target.value })}
+                        />
+                      </div>
                       <div className="md:col-span-1">
                         <Button type="button" onClick={handleAddProduct} className="w-full">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
+
                   </div>
             </div>
           </div>
