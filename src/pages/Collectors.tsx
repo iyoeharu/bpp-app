@@ -312,7 +312,13 @@ export default function Collectors() {
     setDeleteDialogOpen(true);
   };
 
-  const handleOpenSalaryEdit = (collector: Collector) => {
+  const handleOpenSalaryEdit = async (collector: Collector) => {
+    const note = await promptAdminNote({
+      title: "Catatan Ubah Gaji Kolektor",
+      description: `Tuliskan alasan mengubah gaji kolektor ${collector.name}.`,
+      requirePassword: true,
+    });
+    if (!note) return;
     setSalaryEditTarget(collector);
     setSalaryAmount(salaryMap?.get(collector.id)?.amount ?? 0);
     setSalaryDialogOpen(true);
