@@ -161,10 +161,10 @@ export default function Contracts() {
     keuntungan: 0,
   });
 
-  // Product rows for the contract (No, Nama, Harga, Status, Toko)
-  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string };
+  // Product rows for the contract (No, Nama, Harga, Status, Toko, Tgl Ambil)
+  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string; pickup_date: string };
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '' });
+  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
 
   // Auto-sync product_type textarea with product names list
   useEffect(() => {
@@ -176,11 +176,15 @@ export default function Contracts() {
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
     if (!name) { toast.error('Nama produk wajib diisi'); return; }
-    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim() }]);
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    const pickup = newProduct.pickup_date || formData.start_date;
+    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim(), pickup_date: pickup }]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
   };
   const handleRemoveProduct = (idx: number) => {
     setProducts((arr) => arr.filter((_, i) => i !== idx));
+  };
+  const handleUpdateProductPickup = (idx: number, value: string) => {
+    setProducts((arr) => arr.map((p, i) => i === idx ? { ...p, pickup_date: value } : p));
   };
 
   // Replace all contract_products for the given contract with the current list
@@ -195,6 +199,7 @@ export default function Contracts() {
         price: p.price || 0,
         status: p.status,
         store: p.store || null,
+        pickup_date: p.pickup_date || null,
       }));
       const { error } = await (supabase as any).from('contract_products').insert(rows);
       if (error) {
