@@ -387,6 +387,7 @@ export default function SalesAgents() {
         const note = await promptAdminNote({
           title: "Catatan Pembaruan Sales",
           description: `Tuliskan alasan perubahan data sales ${selectedAgent.name}.`,
+          requirePassword: true,
         });
         if (!note) return;
         await updateAgent.mutateAsync({ id: selectedAgent.id, ...formData, _note: note } as any);
@@ -409,6 +410,7 @@ export default function SalesAgents() {
         description: `Tuliskan alasan menghapus sales ${selectedAgent.name}.`,
         confirmLabel: "Hapus",
         variant: "destructive",
+        requirePassword: true,
       });
       if (!note) return;
       await deleteAgent.mutateAsync({ id: selectedAgent.id, _note: note });
@@ -963,6 +965,7 @@ export default function SalesAgents() {
                           const note = await promptAdminNote({
                             title: willDeactivate ? "Catatan Nonaktifkan Sales" : "Catatan Aktifkan Sales",
                             description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} sales ${agent.name}.`,
+                            requirePassword: true,
                           });
                           if (!note) return;
                           updateAgent.mutate({ id: agent.id, is_active: !willDeactivate, _note: note } as any);

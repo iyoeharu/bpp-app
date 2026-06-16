@@ -161,10 +161,10 @@ export default function Contracts() {
     keuntungan: 0,
   });
 
-  // Product rows for the contract (No, Nama, Harga, Status, Toko)
-  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string };
+  // Product rows for the contract (No, Nama, Harga, Status, Toko, Tgl Ambil)
+  type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string; pickup_date: string };
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '' });
+  const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
 
   // Auto-sync product_type textarea with product names list
   useEffect(() => {
@@ -176,11 +176,15 @@ export default function Contracts() {
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
     if (!name) { toast.error('Nama produk wajib diisi'); return; }
-    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim() }]);
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    const pickup = newProduct.pickup_date || formData.start_date;
+    setProducts((arr) => [...arr, { ...newProduct, name, store: newProduct.store.trim(), pickup_date: pickup }]);
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
   };
   const handleRemoveProduct = (idx: number) => {
     setProducts((arr) => arr.filter((_, i) => i !== idx));
+  };
+  const handleUpdateProductPickup = (idx: number, value: string) => {
+    setProducts((arr) => arr.map((p, i) => i === idx ? { ...p, pickup_date: value } : p));
   };
 
   // Replace all contract_products for the given contract with the current list
@@ -195,6 +199,7 @@ export default function Contracts() {
         price: p.price || 0,
         status: p.status,
         store: p.store || null,
+        pickup_date: p.pickup_date || null,
       }));
       const { error } = await (supabase as any).from('contract_products').insert(rows);
       if (error) {
@@ -294,7 +299,7 @@ export default function Contracts() {
           keuntungan: 0,
         });
         setProducts([]);
-        setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+        setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
         setDialogOpen(true);
         // Remove param from URL
         searchParams.delete('newCustomerId');
@@ -321,7 +326,7 @@ export default function Contracts() {
       keuntungan: 0,
     });
     setProducts([]);
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
     setDialogOpen(true);
   };
 
@@ -357,11 +362,11 @@ export default function Contracts() {
       })(),
     });
     // Load existing products
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
     (async () => {
       const { data, error } = await (supabase as any)
         .from('contract_products')
-        .select('id, name, price, status, store, position')
+        .select('id, name, price, status, store, position, pickup_date')
         .eq('contract_id', contract.id)
         .order('position', { ascending: true });
       if (error) {
@@ -374,6 +379,7 @@ export default function Contracts() {
           price: Number(p.price || 0),
           status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
           store: p.store || '',
+          pickup_date: p.pickup_date || '',
         })));
       }
     })();
@@ -474,10 +480,17 @@ export default function Contracts() {
       return;
     }
 
-    // Validasi total harga produk harus sama dengan modal awal
+    // Validasi total harga produk harus sama dengan DP + Modal Awal
     const totalProductsPrice = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
-    if (totalProductsPrice !== (Number(formData.modal) || 0)) {
-      toast.error(`Total harga produk (${formatRupiah(totalProductsPrice)}) harus sama dengan Modal Awal (${formatRupiah(formData.modal || 0)})`);
+    const expectedTotal = (Number(formData.dp) || 0) + (Number(formData.modal) || 0);
+    if (totalProductsPrice !== expectedTotal) {
+      toast.error(`Total harga produk (${formatRupiah(totalProductsPrice)}) harus sama dengan DP + Modal Awal (${formatRupiah(expectedTotal)})`);
+      return;
+    }
+    // Validasi tanggal pengambilan per produk wajib diisi
+    const missingPickup = products.find((p) => !p.pickup_date);
+    if (missingPickup) {
+      toast.error(`Tanggal pengambilan wajib diisi untuk produk: ${missingPickup.name}`);
       return;
     }
     
@@ -1484,9 +1497,16 @@ export default function Contracts() {
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
-                      <span className="text-xs text-muted-foreground">
-                        Total: {formatRupiah(products.reduce((s, p) => s + (p.price || 0), 0))}
-                      </span>
+                      {(() => {
+                        const total = products.reduce((s, p) => s + (p.price || 0), 0);
+                        const expected = (formData.dp || 0) + (formData.modal || 0);
+                        const ok = total === expected && expected > 0;
+                        return (
+                          <span className={cn("text-xs", ok ? "text-green-600" : "text-muted-foreground")}>
+                            Total: {formatRupiah(total)} / Target (DP + Modal): {formatRupiah(expected)}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="rounded-md border overflow-x-auto">
@@ -1498,13 +1518,14 @@ export default function Contracts() {
                             <TableHead className="text-right">Harga</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Toko</TableHead>
+                            <TableHead>Tgl Ambil</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {products.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground">
+                              <TableCell colSpan={7} className="text-center text-xs text-muted-foreground">
                                 Belum ada produk. Tambahkan di bawah.
                               </TableCell>
                             </TableRow>
@@ -1520,6 +1541,14 @@ export default function Contracts() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>{p.store || '-'}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="date"
+                                    value={p.pickup_date || ''}
+                                    onChange={(e) => handleUpdateProductPickup(i, e.target.value)}
+                                    className="h-8 w-[150px]"
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <Button
                                     type="button"
@@ -1537,8 +1566,9 @@ export default function Contracts() {
                       </Table>
                     </div>
 
+
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-3">
                         <Label className="text-xs">Nama Barang</Label>
                         <Input
                           value={newProduct.name}
@@ -1546,7 +1576,7 @@ export default function Contracts() {
                           placeholder="Contoh: Kulkas"
                         />
                       </div>
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <Label className="text-xs">Harga</Label>
                         <CurrencyInput
                           value={newProduct.price}
@@ -1580,7 +1610,7 @@ export default function Contracts() {
                               className="w-full justify-between font-normal"
                             >
                               <span className={cn("truncate", !newProduct.store && "text-muted-foreground")}>
-                                {newProduct.store || "Pilih atau ketik nama toko..."}
+                                {newProduct.store || "Pilih toko..."}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -1629,12 +1659,21 @@ export default function Contracts() {
                           </PopoverContent>
                         </Popover>
                       </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Tgl Ambil</Label>
+                        <Input
+                          type="date"
+                          value={newProduct.pickup_date || ''}
+                          onChange={(e) => setNewProduct({ ...newProduct, pickup_date: e.target.value })}
+                        />
+                      </div>
                       <div className="md:col-span-1">
                         <Button type="button" onClick={handleAddProduct} className="w-full">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
+
                   </div>
             </div>
           </div>

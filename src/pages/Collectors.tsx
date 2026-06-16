@@ -310,6 +310,7 @@ export default function Collectors() {
         const note = await promptAdminNote({
           title: "Catatan Pembaruan Kolektor",
           description: `Tuliskan alasan perubahan data kolektor ${selectedCollector.name}.`,
+          requirePassword: true,
         });
         if (!note) return;
         const updated = await updateCollector.mutateAsync({
@@ -369,6 +370,7 @@ export default function Collectors() {
         description: `Tuliskan alasan menghapus kolektor ${selectedCollector.name}.`,
         confirmLabel: "Hapus",
         variant: "destructive",
+        requirePassword: true,
       });
       if (!note) return;
       await deleteCollector.mutateAsync({ id: selectedCollector.id, _note: note });
@@ -505,6 +507,7 @@ export default function Collectors() {
                             const note = await promptAdminNote({
                               title: willDeactivate ? "Catatan Nonaktifkan Kolektor" : "Catatan Aktifkan Kolektor",
                               description: `Tuliskan alasan ${willDeactivate ? "menonaktifkan" : "mengaktifkan kembali"} kolektor ${collector.name}.`,
+                              requirePassword: true,
                             });
                             if (!note) return;
                             updateCollector.mutate({ id: collector.id, is_active: !willDeactivate, _note: note } as any);
