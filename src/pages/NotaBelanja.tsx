@@ -570,7 +570,7 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      byStore.map((s, i) => {
+                      storePagination.paginatedItems.map((s, i) => {
                         const sisaClass =
                           s.sisa > 0
                             ? "text-red-600"
