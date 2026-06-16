@@ -1497,9 +1497,16 @@ export default function Contracts() {
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
-                      <span className="text-xs text-muted-foreground">
-                        Total: {formatRupiah(products.reduce((s, p) => s + (p.price || 0), 0))}
-                      </span>
+                      {(() => {
+                        const total = products.reduce((s, p) => s + (p.price || 0), 0);
+                        const expected = (formData.dp || 0) + (formData.modal || 0);
+                        const ok = total === expected && expected > 0;
+                        return (
+                          <span className={cn("text-xs", ok ? "text-green-600" : "text-muted-foreground")}>
+                            Total: {formatRupiah(total)} / Target (DP + Modal): {formatRupiah(expected)}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="rounded-md border overflow-x-auto">
@@ -1511,13 +1518,14 @@ export default function Contracts() {
                             <TableHead className="text-right">Harga</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Toko</TableHead>
+                            <TableHead>Tgl Ambil</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {products.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground">
+                              <TableCell colSpan={7} className="text-center text-xs text-muted-foreground">
                                 Belum ada produk. Tambahkan di bawah.
                               </TableCell>
                             </TableRow>
@@ -1534,6 +1542,14 @@ export default function Contracts() {
                                 </TableCell>
                                 <TableCell>{p.store || '-'}</TableCell>
                                 <TableCell>
+                                  <Input
+                                    type="date"
+                                    value={p.pickup_date || ''}
+                                    onChange={(e) => handleUpdateProductPickup(i, e.target.value)}
+                                    className="h-8 w-[150px]"
+                                  />
+                                </TableCell>
+                                <TableCell>
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -1549,6 +1565,7 @@ export default function Contracts() {
                         </TableBody>
                       </Table>
                     </div>
+
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
                       <div className="md:col-span-4">
