@@ -481,7 +481,7 @@ export default function NotaBelanja() {
                       </TableRow>
                     ) : (
                       filtered.map((r, i) => {
-                        const pickupDate = r.pickup_date || r.credit_contracts?.start_date || null;
+                        const pickupDate = r.pickup_date || null;
                         return (
                           <TableRow key={r.id}>
                             <TableCell>{i + 1}</TableCell>
@@ -495,7 +495,7 @@ export default function NotaBelanja() {
                               {pickupDate ? (
                                 formatDate(pickupDate)
                               ) : (
-                                <span className="text-xs text-muted-foreground italic">-</span>
+                                <span className="text-xs text-muted-foreground italic">belum di isi</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -760,6 +760,31 @@ export default function NotaBelanja() {
                     {dialogStoreProducts.length} item hutang
                   </div>
                 </div>
+                {/* Tanggal Pengambilan Summary */}
+                {(() => {
+                  const pickupDates = dialogStoreProducts
+                    .map((p) => p.pickup_date || null)
+                    .filter((d) => d !== null);
+                  const uniqueDates = Array.from(new Set(pickupDates));
+                  const hasNoPickup = dialogStoreProducts.some((p) => !p.pickup_date);
+                  return (
+                    <div className="px-3 py-2 border-b bg-blue-50/50">
+                      <p className="text-xs font-semibold text-blue-900 mb-1">Tanggal Pengambilan Produk:</p>
+                      <div className="text-xs text-blue-800">
+                        {uniqueDates.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {uniqueDates.map((date) => (
+                              <div key={date}>• {formatDate(date)}</div>
+                            ))}
+                            {hasNoPickup && <div className="italic text-muted-foreground">• belum di isi</div>}
+                          </div>
+                        ) : (
+                          <div className="italic text-muted-foreground">Semua produk belum memiliki tanggal pengambilan</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="max-h-48 overflow-y-auto">
                   {dialogStoreProducts.length === 0 ? (
                     <div className="px-3 py-4 text-center text-xs text-muted-foreground">

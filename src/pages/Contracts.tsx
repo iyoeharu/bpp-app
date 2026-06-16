@@ -191,7 +191,11 @@ export default function Contracts() {
   const syncContractProducts = async (contractId: string) => {
     try {
       await (supabase as any).from('contract_products').delete().eq('contract_id', contractId);
-      if (products.length === 0) return;
+      if (products.length === 0) {
+        // Invalidate nota/contract_products list so other pages refresh
+        queryClient.invalidateQueries({ queryKey: ['contract_products_all'] });
+        return;
+      }
       const rows = products.map((p, i) => ({
         contract_id: contractId,
         position: i + 1,
@@ -205,6 +209,10 @@ export default function Contracts() {
       if (error) {
         console.error('Failed to save contract products:', error);
         toast.error('Gagal menyimpan daftar produk: ' + error.message);
+      }
+      else {
+        // Refresh cached list used by NotaBelanja
+        queryClient.invalidateQueries({ queryKey: ['contract_products_all'] });
       }
     } catch (e: any) {
       console.error(e);
