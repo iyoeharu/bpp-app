@@ -299,7 +299,7 @@ export default function Contracts() {
           keuntungan: 0,
         });
         setProducts([]);
-        setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+        setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
         setDialogOpen(true);
         // Remove param from URL
         searchParams.delete('newCustomerId');
@@ -326,7 +326,7 @@ export default function Contracts() {
       keuntungan: 0,
     });
     setProducts([]);
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
     setDialogOpen(true);
   };
 
@@ -362,7 +362,7 @@ export default function Contracts() {
       })(),
     });
     // Load existing products
-    setNewProduct({ name: '', price: 0, status: 'cash', store: '' });
+    setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
     (async () => {
       const { data, error } = await (supabase as any)
         .from('contract_products')
