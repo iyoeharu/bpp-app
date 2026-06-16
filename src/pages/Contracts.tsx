@@ -366,7 +366,7 @@ export default function Contracts() {
     (async () => {
       const { data, error } = await (supabase as any)
         .from('contract_products')
-        .select('id, name, price, status, store, position')
+        .select('id, name, price, status, store, position, pickup_date')
         .eq('contract_id', contract.id)
         .order('position', { ascending: true });
       if (error) {
