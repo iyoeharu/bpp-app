@@ -622,6 +622,12 @@ export default function NotaBelanja() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={storePagination.currentPage}
+                totalPages={storePagination.totalPages}
+                onPageChange={storePagination.goToPage}
+                totalItems={storePagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
