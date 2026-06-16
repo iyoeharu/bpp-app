@@ -410,6 +410,7 @@ export default function SalesAgents() {
         description: `Tuliskan alasan menghapus sales ${selectedAgent.name}.`,
         confirmLabel: "Hapus",
         variant: "destructive",
+        requirePassword: true,
       });
       if (!note) return;
       await deleteAgent.mutateAsync({ id: selectedAgent.id, _note: note });
