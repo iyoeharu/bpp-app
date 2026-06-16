@@ -370,6 +370,7 @@ export default function Collectors() {
         description: `Tuliskan alasan menghapus kolektor ${selectedCollector.name}.`,
         confirmLabel: "Hapus",
         variant: "destructive",
+        requirePassword: true,
       });
       if (!note) return;
       await deleteCollector.mutateAsync({ id: selectedCollector.id, _note: note });
