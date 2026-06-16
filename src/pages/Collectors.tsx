@@ -140,7 +140,13 @@ export default function Collectors() {
     setStaffAmount(0);
     setStaffDialogOpen(true);
   };
-  const handleOpenStaffEdit = (row: StaffSalaryRow) => {
+  const handleOpenStaffEdit = async (row: StaffSalaryRow) => {
+    const note = await promptAdminNote({
+      title: "Catatan Ubah Gaji Karyawan",
+      description: `Tuliskan alasan mengubah gaji karyawan ${row.name || row.position}.`,
+      requirePassword: true,
+    });
+    if (!note) return;
     setStaffEditTarget(row);
     setStaffLocked(true);
     setStaffPosition(row.position);
@@ -149,7 +155,13 @@ export default function Collectors() {
     setStaffDialogOpen(true);
   };
   // Untuk baris virtual (posisi dari registry, belum ada baris bulan ini)
-  const handleOpenStaffVirtual = (position: string, name: string) => {
+  const handleOpenStaffVirtual = async (position: string, name: string) => {
+    const note = await promptAdminNote({
+      title: "Catatan Set Gaji Karyawan",
+      description: `Tuliskan alasan mengatur gaji karyawan ${name || position} bulan ini.`,
+      requirePassword: true,
+    });
+    if (!note) return;
     setStaffEditTarget(null);
     setStaffLocked(true);
     setStaffPosition(position);
@@ -186,6 +198,14 @@ export default function Collectors() {
     setStaffDialogOpen(false);
   };
   const handleDeleteStaff = async (row: StaffSalaryRow) => {
+    const note = await promptAdminNote({
+      title: "Catatan Hapus Gaji Karyawan",
+      description: `Tuliskan alasan menghapus gaji karyawan ${row.name || row.position}.`,
+      confirmLabel: "Hapus",
+      variant: "destructive",
+      requirePassword: true,
+    });
+    if (!note) return;
     await deleteStaffSalary.mutateAsync(row.id);
   };
 
@@ -292,7 +312,13 @@ export default function Collectors() {
     setDeleteDialogOpen(true);
   };
 
-  const handleOpenSalaryEdit = (collector: Collector) => {
+  const handleOpenSalaryEdit = async (collector: Collector) => {
+    const note = await promptAdminNote({
+      title: "Catatan Ubah Gaji Kolektor",
+      description: `Tuliskan alasan mengubah gaji kolektor ${collector.name}.`,
+      requirePassword: true,
+    });
+    if (!note) return;
     setSalaryEditTarget(collector);
     setSalaryAmount(salaryMap?.get(collector.id)?.amount ?? 0);
     setSalaryDialogOpen(true);

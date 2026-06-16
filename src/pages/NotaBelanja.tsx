@@ -60,6 +60,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/TablePagination";
 import {
   format,
   startOfMonth,
@@ -314,6 +316,10 @@ export default function NotaBelanja() {
   const sisaColor =
     totals.sisa > 0 ? "text-red-600" : totals.sisa < 0 ? "text-emerald-600" : "text-foreground";
 
+  const productPagination = usePagination(filtered, 10);
+  const storePagination = usePagination(byStore, 10);
+  const paymentPagination = usePagination(payments, 10);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -480,11 +486,12 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.map((r, i) => {
+                      productPagination.paginatedItems.map((r, i) => {
                         const pickupDate = r.pickup_date || null;
+                        const globalIdx = (productPagination.currentPage - 1) * 10 + i + 1;
                         return (
                           <TableRow key={r.id}>
-                            <TableCell>{i + 1}</TableCell>
+                            <TableCell>{globalIdx}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {r.credit_contracts?.contract_ref || "-"}
                             </TableCell>
@@ -525,6 +532,12 @@ export default function NotaBelanja() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={productPagination.currentPage}
+                totalPages={productPagination.totalPages}
+                onPageChange={productPagination.goToPage}
+                totalItems={productPagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -557,16 +570,17 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      byStore.map((s, i) => {
+                      storePagination.paginatedItems.map((s, i) => {
                         const sisaClass =
                           s.sisa > 0
                             ? "text-red-600"
                             : s.sisa < 0
                               ? "text-emerald-600"
                               : "text-muted-foreground";
+                        const globalIdx = (storePagination.currentPage - 1) * 10 + i + 1;
                         return (
                           <TableRow key={s.store}>
-                            <TableCell>{i + 1}</TableCell>
+                            <TableCell>{globalIdx}</TableCell>
                             <TableCell className="font-medium">{s.store}</TableCell>
                             <TableCell className="text-right">{s.items}</TableCell>
                             <TableCell className="text-right text-green-600">
@@ -608,6 +622,12 @@ export default function NotaBelanja() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={storePagination.currentPage}
+                totalPages={storePagination.totalPages}
+                onPageChange={storePagination.goToPage}
+                totalItems={storePagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -640,23 +660,32 @@ export default function NotaBelanja() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      payments.map((p, i) => (
-                        <TableRow key={p.id}>
-                          <TableCell>{i + 1}</TableCell>
-                          <TableCell>{formatDate(p.payment_date)}</TableCell>
-                          <TableCell className="font-medium">{p.store}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {p.notes || "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-blue-600">
-                            {formatRupiah(Number(p.amount))}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      paymentPagination.paginatedItems.map((p, i) => {
+                        const globalIdx = (paymentPagination.currentPage - 1) * 10 + i + 1;
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell>{globalIdx}</TableCell>
+                            <TableCell>{formatDate(p.payment_date)}</TableCell>
+                            <TableCell className="font-medium">{p.store}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {p.notes || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-blue-600">
+                              {formatRupiah(Number(p.amount))}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={paymentPagination.currentPage}
+                totalPages={paymentPagination.totalPages}
+                onPageChange={paymentPagination.goToPage}
+                totalItems={paymentPagination.totalItems}
+              />
             </CardContent>
           </Card>
         </TabsContent>
