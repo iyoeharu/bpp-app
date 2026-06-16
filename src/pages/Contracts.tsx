@@ -379,6 +379,7 @@ export default function Contracts() {
           price: Number(p.price || 0),
           status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
           store: p.store || '',
+          pickup_date: p.pickup_date || '',
         })));
       }
     })();
