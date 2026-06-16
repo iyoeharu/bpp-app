@@ -316,6 +316,10 @@ export default function NotaBelanja() {
   const sisaColor =
     totals.sisa > 0 ? "text-red-600" : totals.sisa < 0 ? "text-emerald-600" : "text-foreground";
 
+  const productPagination = usePagination(filtered, 10);
+  const storePagination = usePagination(byStore, 10);
+  const paymentPagination = usePagination(payments, 10);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
