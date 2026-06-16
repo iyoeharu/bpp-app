@@ -253,6 +253,7 @@ export default function Customers() {
         description: `Tuliskan alasan menghapus customer ${selectedCustomer.name}.`,
         confirmLabel: "Hapus",
         variant: "destructive",
+        requirePassword: true,
       });
       if (!note) return;
       await deleteCustomer.mutateAsync({ id: selectedCustomer.id, _note: note });
