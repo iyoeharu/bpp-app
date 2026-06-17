@@ -26,6 +26,7 @@ const CustomerHistory = lazy(() => import("./pages/CustomerHistory"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Holidays = lazy(() => import("./pages/Holidays"));
 const NotaBelanja = lazy(() => import("./pages/NotaBelanja"));
+const NotaDashboard = lazy(() => import("./pages/NotaDashboard"));
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const AppRoutes = () => {
                   <Route path="/holidays" element={<Holidays />} />
                   <Route path="/collection" element={<Collection />} />
                   <Route path="/nota-belanja" element={<NotaBelanja />} />
+                  <Route path="/nota-dashboard" element={<NotaDashboard />} />
                   
                   <Route path="/history" element={<CustomerHistory />} />
                   <Route path="/audit-log" element={<AuditLog />} />

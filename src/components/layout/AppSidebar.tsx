@@ -11,6 +11,8 @@ import {
   Shield,
   Calendar,
   Receipt,
+  LayoutDashboard as DashboardIcon,
+
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +44,7 @@ const masterItems = [
 const operationItems = [
   { title: "Penagihan", url: "/collection", icon: Wallet },
   { title: "Nota Belanja", url: "/nota-belanja", icon: Receipt },
+  { title: "Dashboard Nota", url: "/nota-dashboard", icon: DashboardIcon },
   { title: "Riwayat Pelanggan", url: "/history", icon: History },
 ];
 
