@@ -173,6 +173,14 @@ export default function Contracts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
+  // Auto-compute Modal Awal = total harga produk + DP (read-only)
+  useEffect(() => {
+    const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const computedModal = totalProducts + (Number(formData.dp) || 0);
+    setFormData((prev) => (prev.modal === computedModal ? prev : { ...prev, modal: computedModal }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, formData.dp]);
+
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
     if (!name) { toast.error('Nama produk wajib diisi'); return; }
