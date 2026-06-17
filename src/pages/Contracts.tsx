@@ -1456,11 +1456,13 @@ export default function Contracts() {
                     <CurrencyInput
                       id="modal"
                       value={formData.modal}
-                      onValueChange={(val) => setFormData({ ...formData, modal: val || 0 })}
+                      onValueChange={() => { /* read-only, dihitung otomatis */ }}
+                      disabled
+                      readOnly
                       placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Modal awal sebelum dikurangi DP
+                      Otomatis: Total Harga Produk + DP
                     </p>
                   </div>
                   <div>
