@@ -1778,7 +1778,7 @@ export default function Contracts() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Modal</p>
-                          <p className="font-semibold text-lg">{formatRupiah(selectedContract.omset || 0)}</p>
+                          <p className="font-semibold text-lg">{formatRupiah((selectedContract.omset || 0) + ((selectedContract as any).dp || 0))}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">DP (Down Payment)</p>
@@ -1786,7 +1786,7 @@ export default function Contracts() {
                         </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Keuntungan</p>
-                            <p className="font-semibold text-lg">{formatRupiah((selectedContract as any).keuntungan || ((selectedContract.total_loan_amount || 0) - (selectedContract.omset || 0)))}</p>
+                            <p className="font-semibold text-lg">{formatRupiah((selectedContract.total_loan_amount || 0) - ((selectedContract.omset || 0) + ((selectedContract as any).dp || 0)))}</p>
                           </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Cicilan Harian</p>
