@@ -360,8 +360,9 @@ export default function Contracts() {
       daily_installment_amount: contract.daily_installment_amount,
       start_date: contract.start_date || new Date().toISOString().split("T")[0],
       status: contract.status,
-      modal: (contract as any).omset || 0,
-        dp: (contract as any).dp || 0,
+      // omset yang tersimpan = modal - dp, jadi kembalikan modal awal = omset + dp
+      modal: ((contract as any).omset || 0) + ((contract as any).dp || 0),
+      dp: (contract as any).dp || 0,
       // Convert stored TOTAL keuntungan -> per-day for UI display
       keuntungan: (() => {
         const totalKeuntungan = (contract as any).keuntungan || 0;
