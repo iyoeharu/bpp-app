@@ -173,6 +173,14 @@ export default function Contracts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
+  // Auto-compute Modal Awal = total harga produk + DP (read-only)
+  useEffect(() => {
+    const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const computedModal = totalProducts + (Number(formData.dp) || 0);
+    setFormData((prev) => (prev.modal === computedModal ? prev : { ...prev, modal: computedModal }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, formData.dp]);
+
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
     if (!name) { toast.error('Nama produk wajib diisi'); return; }
@@ -489,13 +497,8 @@ export default function Contracts() {
       return;
     }
 
-    // Validasi total harga produk harus sama dengan DP + Modal Awal
-    const totalProductsPrice = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
-    const expectedTotal = (Number(formData.dp) || 0) + (Number(formData.modal) || 0);
-    if (totalProductsPrice !== expectedTotal) {
-      toast.error(`Total harga produk (${formatRupiah(totalProductsPrice)}) harus sama dengan DP + Modal Awal (${formatRupiah(expectedTotal)})`);
-      return;
-    }
+    // Modal Awal otomatis = total harga produk + DP (sudah terisi otomatis, tidak perlu validasi)
+
     // Validasi tanggal pengambilan per produk wajib diisi
     const missingPickup = products.find((p) => !p.pickup_date);
     if (missingPickup) {
@@ -1453,11 +1456,13 @@ export default function Contracts() {
                     <CurrencyInput
                       id="modal"
                       value={formData.modal}
-                      onValueChange={(val) => setFormData({ ...formData, modal: val || 0 })}
+                      onValueChange={() => { /* read-only, dihitung otomatis */ }}
+                      disabled
+                      readOnly
                       placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Modal awal sebelum dikurangi DP
+                      Otomatis: Total Harga Produk + DP
                     </p>
                   </div>
                   <div>
@@ -1508,11 +1513,9 @@ export default function Contracts() {
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
                       {(() => {
                         const total = products.reduce((s, p) => s + (p.price || 0), 0);
-                        const expected = (formData.dp || 0) + (formData.modal || 0);
-                        const ok = total === expected && expected > 0;
                         return (
-                          <span className={cn("text-xs", ok ? "text-green-600" : "text-muted-foreground")}>
-                            Total: {formatRupiah(total)} / Target (DP + Modal): {formatRupiah(expected)}
+                          <span className="text-xs text-muted-foreground">
+                            Total Harga Produk: {formatRupiah(total)}
                           </span>
                         );
                       })()}
