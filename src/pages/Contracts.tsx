@@ -1513,11 +1513,9 @@ export default function Contracts() {
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
                       {(() => {
                         const total = products.reduce((s, p) => s + (p.price || 0), 0);
-                        const expected = (formData.dp || 0) + (formData.modal || 0);
-                        const ok = total === expected && expected > 0;
                         return (
-                          <span className={cn("text-xs", ok ? "text-green-600" : "text-muted-foreground")}>
-                            Total: {formatRupiah(total)} / Target (DP + Modal): {formatRupiah(expected)}
+                          <span className="text-xs text-muted-foreground">
+                            Total Harga Produk: {formatRupiah(total)}
                           </span>
                         );
                       })()}
