@@ -497,13 +497,8 @@ export default function Contracts() {
       return;
     }
 
-    // Validasi total harga produk harus sama dengan DP + Modal Awal
-    const totalProductsPrice = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
-    const expectedTotal = (Number(formData.dp) || 0) + (Number(formData.modal) || 0);
-    if (totalProductsPrice !== expectedTotal) {
-      toast.error(`Total harga produk (${formatRupiah(totalProductsPrice)}) harus sama dengan DP + Modal Awal (${formatRupiah(expectedTotal)})`);
-      return;
-    }
+    // Modal Awal otomatis = total harga produk + DP (sudah terisi otomatis, tidak perlu validasi)
+
     // Validasi tanggal pengambilan per produk wajib diisi
     const missingPickup = products.find((p) => !p.pickup_date);
     if (missingPickup) {
