@@ -516,7 +516,7 @@ export default function Dashboard() {
         <CardContent>
           {isLoadingExpenses ? (
             <Skeleton className="h-[150px] w-full" />
-          ) : expenses && expenses.length > 0 ? (
+          ) : expenses && expenses.filter(e => e.category !== 'Gaji Karyawan' && e.category !== 'Gaji Kolektor').length > 0 ? (
             <div className="grid grid-cols-1 gap-4">
               {/* Left: Expenses table (full width) */}
               <div className="rounded-md border">
@@ -532,7 +532,8 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expenses.map((expense) => (
+                    {expenses.filter(e => e.category !== 'Gaji Karyawan' && e.category !== 'Gaji Kolektor').map((expense) => (
+
                       <TableRow key={expense.id}>
                         <TableCell>
                           {new Date(expense.expense_date).toLocaleDateString(locale, {
