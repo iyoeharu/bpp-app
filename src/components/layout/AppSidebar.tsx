@@ -44,7 +44,7 @@ const masterItems = [
 const operationItems = [
   { title: "Penagihan", url: "/collection", icon: Wallet },
   { title: "Nota Belanja", url: "/nota-belanja", icon: Receipt },
-  { title: "Dashboard Nota", url: "/nota-dashboard", icon: DashboardIcon },
+  { title: "Catatan Keuangan", url: "/nota-dashboard", icon: DashboardIcon },
   { title: "Riwayat Pelanggan", url: "/history", icon: History },
 ];
 

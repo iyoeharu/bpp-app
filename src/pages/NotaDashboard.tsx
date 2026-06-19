@@ -211,7 +211,7 @@ export default function NotaDashboard() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard Nota</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Catatan Keuangan</h1>
           <p className="text-sm text-muted-foreground">
             Ringkasan keuangan periode {periodLabel}
           </p>
