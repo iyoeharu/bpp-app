@@ -15,14 +15,17 @@ import { toast } from 'sonner';
 const CATEGORY = 'Gaji Karyawan';
 const POSITION_RE = /\[position:([^\]]+)\]/;
 const NAME_RE = /\[name:([^\]]+)\]/;
+const PHONE_RE = /\[phone:([^\]]+)\]/;
 const tagFor = (position: string) => `[position:${position.trim()}]`;
 const nameTagFor = (name: string) => `[name:${name.trim()}]`;
+const phoneTagFor = (phone: string) => `[phone:${phone.trim()}]`;
 const monthKey = (month: Date) => format(startOfMonth(month), 'yyyy-MM-dd');
 
 export interface StaffSalaryRow {
   id: string;
   position: string;
   name: string;
+  phone?: string | null;
   amount: number;
   notes: string | null;
 }
@@ -30,6 +33,7 @@ export interface StaffSalaryRow {
 export interface StaffPositionRegistryEntry {
   position: string;
   name: string;
+  phone?: string | null;
 }
 
 /**
@@ -55,8 +59,10 @@ export const useStaffPositionsRegistry = () => {
         const position = pm[1].trim();
         const nm = (r.notes || '').match(NAME_RE);
         const name = nm ? nm[1].trim() : '';
+        const ph = (r.notes || '').match(PHONE_RE);
+        const phone = ph ? ph[1].trim() : '';
         const key = position.toLowerCase();
-        if (!map.has(key)) map.set(key, { position, name });
+        if (!map.has(key)) map.set(key, { position, name, phone });
       });
       return Array.from(map.values()).sort((a, b) => a.position.localeCompare(b.position));
     },
@@ -83,10 +89,12 @@ export const useStaffSalaries = (month: Date = new Date()) => {
         const m = (r.notes || '').match(POSITION_RE);
         if (!m) return;
         const nm = (r.notes || '').match(NAME_RE);
+        const ph = (r.notes || '').match(PHONE_RE);
         rows.push({
           id: r.id,
           position: m[1],
           name: nm ? nm[1] : '',
+          phone: ph ? ph[1] : '',
           amount: Number(r.amount || 0),
           notes: r.notes,
         });
@@ -134,14 +142,16 @@ export const useSetStaffSalary = () => {
       id?: string;          // existing row id (edit)
       position: string;
       name: string;
+      phone?: string | null;
       amount: number;
       month: Date;
     }) => {
       const monthStart = monthKey(input.month);
       const tag = tagFor(input.position);
       const nameTag = nameTagFor(input.name);
+      const phoneTag = input.phone ? phoneTagFor(input.phone) : '';
       const description = `Gaji ${input.position} (${input.name}) - ${format(startOfMonth(input.month), 'MMM yyyy')}`;
-      const notes = `${tag} ${nameTag} Gaji bulanan karyawan`;
+      const notes = `${tag} ${nameTag} ${phoneTag} Gaji bulanan karyawan`.trim();
 
       if (input.id) {
         if (input.amount <= 0) {

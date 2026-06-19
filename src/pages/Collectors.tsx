@@ -95,6 +95,7 @@ export default function Collectors() {
   const [staffLocked, setStaffLocked] = useState(false);
   const [staffPosition, setStaffPosition] = useState("");
   const [staffName, setStaffName] = useState("");
+  const [staffPhone, setStaffPhone] = useState("");
   const [staffAmount, setStaffAmount] = useState<number>(0);
 
   // Gabungan: baris gaji bulan ini + posisi dari registry yg belum diisi bulan ini.
@@ -151,6 +152,7 @@ export default function Collectors() {
     setStaffLocked(true);
     setStaffPosition(row.position);
     setStaffName(row.name || "");
+    setStaffPhone((row as any).phone || "");
     setStaffAmount(row.amount);
     setStaffDialogOpen(true);
   };
@@ -166,6 +168,7 @@ export default function Collectors() {
     setStaffLocked(true);
     setStaffPosition(position);
     setStaffName(name);
+    setStaffPhone("");
     setStaffAmount(0);
     setStaffDialogOpen(true);
   };
@@ -192,6 +195,7 @@ export default function Collectors() {
       id: staffEditTarget?.id,
       position: pos,
       name: nm,
+      phone: staffPhone || null,
       amount: staffAmount || 0,
       month: selectedMonth,
     });
@@ -734,10 +738,11 @@ export default function Collectors() {
         <div className="rounded-md border">
           <Table>
             <TableHeader>
-              <TableRow>
+                <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Posisi / Jabatan</TableHead>
                 <TableHead>Nama</TableHead>
+                <TableHead>No. Telepon</TableHead>
                 <TableHead className="text-right">Gaji Bulan Ini</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -755,6 +760,7 @@ export default function Collectors() {
                     <TableCell>{i + 1}</TableCell>
                     <TableCell className="font-medium">{row.position}</TableCell>
                     <TableCell>{row.name || "-"}</TableCell>
+                    <TableCell>{(row as any).phone || "-"}</TableCell>
                     <TableCell className="text-right">
                       {row.isVirtual ? (
                         <button
@@ -855,6 +861,16 @@ export default function Collectors() {
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
                 placeholder="Contoh: Budi Santoso"
+                disabled={staffLocked}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>No. Telepon</Label>
+              <Input
+                value={staffPhone}
+                onChange={(e) => setStaffPhone(e.target.value)}
+                placeholder="08xxxxxxxxxx"
                 disabled={staffLocked}
               />
             </div>
