@@ -182,10 +182,11 @@ export default function NotaDashboard() {
 
   const d = data;
 
+  const totalPemasukan = (d?.totalTertagih || 0) + (d?.totalDp || 0);
   const inflowCards = [
     { label: "Total Tertagih", value: d?.totalTertagih || 0, icon: ArrowUp, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Total Invoice (Hutang)", value: d?.totalInvoice || 0, icon: Receipt, color: "text-red-600", bg: "bg-red-50" },
     { label: "Total DP", value: d?.totalDp || 0, icon: Wallet, color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "Total Pemasukan", value: totalPemasukan, icon: Banknote, color: "text-emerald-700", bg: "bg-emerald-100" },
   ];
 
   const outflowCards = [
