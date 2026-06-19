@@ -925,7 +925,7 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground mb-3">
                     Klik untuk melihat kontrak yang didapat
                   </p>
-                  <div className="rounded-md border">
+                  <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -933,20 +933,32 @@ export default function Dashboard() {
                           <TableHead>Kode Sales</TableHead>
                           <TableHead className="text-right">Modal</TableHead>
                           <TableHead className="text-right">Omset</TableHead>
-                          
                           <TableHead className="text-right">Margin %</TableHead>
-                          <TableHead className="text-right">Komisi</TableHead>
+                          <TableHead className="text-right">Komisi Bulanan (Setahun)</TableHead>
+                          <TableHead className="text-right">Bonus 0.8%</TableHead>
+                          <TableHead className="text-right">Return</TableHead>
+                          <TableHead className="text-right">Keuntungan</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {yearlyFinancial.agents.map((agent, index) => {
-                          // Margin = (Omset − Modal) / Modal × 100  — konsisten dengan tab bulanan
+                          // Margin = (Omset − Modal) / Modal × 100
                           const profitMargin = agent.total_modal > 0 
                             ? ((agent.profit / agent.total_modal) * 100) 
                             : 0;
-                          // Komisi tahunan = Omset × 0.8% (bonus tahunan absolute)
-                          const yearlyAgentCommission = (agent.total_omset || 0) * 0.008;
+                          // Komisi bulanan terakumulasi 1 tahun (tier per bulan)
+                          const monthlyCommissionYearly = agent.total_commission || 0;
+                          // Bonus tahunan 0.8% × Omset
+                          const yearlyBonus = (agent.total_omset || 0) * 0.008;
+                          // Data return per agen
+                          const returnInfo = returnedLossYearly?.by_sales?.find(
+                            (s: any) => s.sales_id === agent.agent_id
+                          );
+                          const returnCount = returnInfo?.contract_count || 0;
+                          const returnLoss = returnInfo?.total_loss || 0;
+                          // Keuntungan = Omset − Modal − Komisi Bulanan Setahun − Bonus 0.8%
+                          const keuntungan = (agent.total_omset || 0) - (agent.total_modal || 0) - monthlyCommissionYearly - yearlyBonus;
                           return (
                             <TableRow 
                               key={agent.agent_id}
@@ -961,13 +973,27 @@ export default function Dashboard() {
                               <TableCell>
                                 <div>
                                   <p className="font-medium">{agent.agent_code}</p>
-                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak • 0.8% bonus</p>
+                                  <p className="text-xs text-muted-foreground">{agent.agent_name} • {agent.contracts_count} kontrak</p>
                                 </div>
                               </TableCell>
                               <TableCell className="text-right text-blue-600">{formatRupiah(agent.total_modal)}</TableCell>
                               <TableCell className="text-right">{formatRupiah(agent.total_omset)}</TableCell>
                               <TableCell className="text-right text-emerald-600">{profitMargin.toFixed(1)}%</TableCell>
-                              <TableCell className="text-right text-purple-600">{formatRupiah(yearlyAgentCommission)}</TableCell>
+                              <TableCell className="text-right text-purple-600">{formatRupiah(monthlyCommissionYearly)}</TableCell>
+                              <TableCell className="text-right text-purple-600">{formatRupiah(yearlyBonus)}</TableCell>
+                              <TableCell className="text-right">
+                                {returnCount > 0 ? (
+                                  <div>
+                                    <p className="text-red-600 font-medium">{returnCount} kontrak</p>
+                                    <p className="text-xs text-muted-foreground">{formatRupiah(returnLoss)}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className={`text-right font-semibold ${keuntungan >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                                {formatRupiah(keuntungan)}
+                              </TableCell>
                               <TableCell>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </TableCell>
