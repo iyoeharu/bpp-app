@@ -184,7 +184,6 @@ export default function NotaDashboard() {
 
   const inflowCards = [
     { label: "Total Tertagih", value: d?.totalTertagih || 0, icon: ArrowUp, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Total Cash", value: d?.totalCash || 0, icon: Banknote, color: "text-green-600", bg: "bg-green-50" },
     { label: "Total Invoice (Hutang)", value: d?.totalInvoice || 0, icon: Receipt, color: "text-red-600", bg: "bg-red-50" },
     { label: "Total DP", value: d?.totalDp || 0, icon: Wallet, color: "text-amber-600", bg: "bg-amber-50" },
   ];
