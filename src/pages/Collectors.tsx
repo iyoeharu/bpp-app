@@ -104,27 +104,30 @@ export default function Collectors() {
     id: string | null;
     position: string;
     name: string;
+    phone?: string;
     amount: number;
     isVirtual: boolean;
   };
   const mergedStaffRows: MergedStaffRow[] = (() => {
     const map = new Map<string, MergedStaffRow>();
-    (staffSalaries || []).forEach((r) => {
+    (staffSalaries || []).forEach((r: any) => {
       map.set(r.position.toLowerCase(), {
         id: r.id,
         position: r.position,
         name: r.name || "",
+        phone: r.phone || "",
         amount: r.amount,
         isVirtual: false,
       });
     });
-    (positionRegistry || []).forEach((r) => {
+    (positionRegistry || []).forEach((r: any) => {
       const key = r.position.toLowerCase();
       if (!map.has(key)) {
         map.set(key, {
           id: null,
           position: r.position,
           name: r.name,
+          phone: (r as any).phone || "",
           amount: 0,
           isVirtual: true,
         });
@@ -138,6 +141,7 @@ export default function Collectors() {
     setStaffLocked(false);
     setStaffPosition("");
     setStaffName("");
+    setStaffPhone("");
     setStaffAmount(0);
     setStaffDialogOpen(true);
   };

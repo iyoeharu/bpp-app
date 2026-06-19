@@ -186,6 +186,7 @@ export default function NotaDashboard() {
     { label: "Total Tertagih", value: d?.totalTertagih || 0, icon: ArrowUp, color: "text-emerald-600", bg: "bg-emerald-50" },
     { label: "Total Cash", value: d?.totalCash || 0, icon: Banknote, color: "text-green-600", bg: "bg-green-50" },
     { label: "Total Invoice (Hutang)", value: d?.totalInvoice || 0, icon: Receipt, color: "text-red-600", bg: "bg-red-50" },
+    { label: "Total DP", value: d?.totalDp || 0, icon: Wallet, color: "text-amber-600", bg: "bg-amber-50" },
   ];
 
   const outflowCards = [
@@ -195,7 +196,6 @@ export default function NotaDashboard() {
     { label: "Bayar Hutang", value: d?.bayarHutang || 0, icon: HandCoins, color: "text-rose-600", bg: "bg-rose-50" },
     { label: "Bayar Cash", value: d?.totalCash || 0, icon: CreditCard, color: "text-pink-600", bg: "bg-pink-50" },
     { label: "Komisi Sales", value: d?.komisiSales || 0, icon: Percent, color: "text-purple-600", bg: "bg-purple-50" },
-    { label: "Total DP", value: d?.totalDp || 0, icon: Wallet, color: "text-amber-600", bg: "bg-amber-50" },
   ];
 
   const totalOutflow =
@@ -205,7 +205,7 @@ export default function NotaDashboard() {
     (d?.bayarHutang || 0) +
     (d?.totalCash || 0) +
     (d?.komisiSales || 0) +
-    (d?.totalDp || 0);
+    0;
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -257,7 +257,7 @@ export default function NotaDashboard() {
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             Total Tertagih − Biaya Operasional − Gaji Karyawan − Gaji Kolektor − Bayar Hutang − Bayar
-            Cash − Komisi Sales − Total DP
+            Cash − Komisi Sales + Total DP
           </p>
         </CardContent>
       </Card>
