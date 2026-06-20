@@ -28,10 +28,10 @@ interface CollectorGroup {
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'No Kupon', 'Jumlah Kupon', 'Kupon Dibayar', 'Angsuran', 'Total Tertagih', 'Status'
+  'No', 'Konsumen', 'Kode Kontrak', 'No Kupon', 'Kupon Dibayar', 'Kupon Pulang', 'Angsuran', 'Total Tertagih', 'Status'
 ];
 // Increased widths for better readability, reduced Kode Kontrak with wrap text
-const COL_WIDTHS = [6, 30, 10, 12, 11, 11, 12, 16, 15];
+const COL_WIDTHS = [6, 14, 12, 12, 11, 11, 12, 16, 15];
 
 // Color tokens for payment status (based on paid vs total)
 const PAYMENT_STATUS_FILLS: Record<string, { bg: string; fg: string }> = {
@@ -256,23 +256,22 @@ export const exportPaymentPerCollectorDaily = async (
 
   // ========= Summary sheet =========
   const summarySheet = workbook.addWorksheet('Ringkasan');
-  summarySheet.mergeCells('A1:F1');
+  summarySheet.mergeCells('A1:G1');
   const t = summarySheet.getCell('A1');
   t.value = 'LAPORAN INPUT PEMBAYARAN - RINGKASAN PER KOLEKTOR';
   t.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
   t.alignment = { horizontal: 'center' };
   t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
-  summarySheet.mergeCells('A2:F2');
+  summarySheet.mergeCells('A2:G2');
   const d = summarySheet.getCell('A2');
   d.value = `Tanggal: ${new Date(selectedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   d.font = { italic: true, size: 12 };
   d.alignment = { horizontal: 'center' };
   summarySheet.addRow([]);
-
-  const summaryHeaders = ['No', 'Kolektor', 'Kode', 'Konsumen', 'Total Kupon', 'Total Dibayar', 'Total Tertagih'];
+  const summaryHeaders = ['No', 'Kolektor', 'Kode', 'Konsumen', 'Konsumen (%)', 'Total Dibayar', 'Total Tertagih'];
   const sh = summarySheet.addRow(summaryHeaders);
-  sh.height = 25; // Increase height for wrapped text
+  sh.height = 28; // Increase height for wrapped text
   sh.eachCell((cell) => {
     cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } };
@@ -293,16 +292,29 @@ export const exportPaymentPerCollectorDaily = async (
       customerSet.add(normalizedValue);
     });
     const konsumenCount = customerSet.size;
-    const r = summarySheet.addRow([i + 1, c.collectorName, c.collectorCode, konsumenCount, totalCoupons, totalPaid, totalAmount]);
+    // compute percentage of consumers for this collector relative to total consumers across all collectors
+    // first compute total consumers across all collectors (done once outside loop) - calculate here
+    const totalConsumersAll = Array.from(collectorList).reduce((acc, g) => {
+      const set = new Set<string>();
+      g.details.forEach((dd) => {
+        const contractObj = contracts.find((ct) => ct.id === dd.contractId);
+        const phoneNumber = contractObj?.customers?.phone_number || (dd.customerName || '-').trim();
+        set.add(String(phoneNumber).trim().toLowerCase());
+      });
+      return acc + set.size;
+    }, 0);
+    const percent = totalConsumersAll > 0 ? Math.round((konsumenCount / totalConsumersAll) * 100) : 0;
+
+    const r = summarySheet.addRow([i + 1, c.collectorName, c.collectorCode, konsumenCount, `${percent}%`, totalPaid, totalAmount]);
     r.eachCell((cell, col) => {
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
       cell.font = { size: 12 };
       if (col === 1) cell.alignment = { horizontal: 'center' };
-      else if (col === 5 || col === 6) { cell.numFmt = '#,##0'; cell.alignment = { horizontal: 'center' }; }
+      else if (col === 6) { cell.numFmt = '#,##0'; cell.alignment = { horizontal: 'center' }; }
       else if (col === 7) { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: 'right' }; }
     });
   });
-  summarySheet.columns = [5, 22, 12, 14, 14, 14, 20].map((w) => ({ width: w }));
+  summarySheet.columns = [5, 12, 12, 12, 12, 12, 20].map((w) => ({ width: w }));
 
   // ========= Per-collector detail sheets =========
   const usedNames = new Set<string>();
@@ -316,15 +328,15 @@ export const exportPaymentPerCollectorDaily = async (
     usedNames.add(safeName);
 
     const sheet = workbook.addWorksheet(safeName);
-    sheet.mergeCells('A1:I1');
-    const tt = sheet.getCell('A1');
-    tt.value = `LAPORAN INPUT PEMBAYARAN - ${c.collectorName.toUpperCase()}`;
-    tt.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  sheet.mergeCells('A1:I1');
+  const tt = sheet.getCell('A1');
+  tt.value = `LAPORAN INPUT PEMBAYARAN - ${c.collectorName.toUpperCase()}`;
+  tt.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
     tt.alignment = { horizontal: 'center' };
     tt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
-    sheet.mergeCells('A2:I2');
-    const dd = sheet.getCell('A2');
+  sheet.mergeCells('A2:I2');
+  const dd = sheet.getCell('A2');
     // compute distinct consumers for this collector: acuan adalah nomor HP (phone_number)
     const customerSetForCollector = new Set<string>();
     c.details.forEach((d) => {
@@ -339,7 +351,6 @@ export const exportPaymentPerCollectorDaily = async (
     dd.font = { italic: true, size: 12 };
     dd.alignment = { horizontal: 'left' };
     sheet.addRow([]);
-
     const hRow = sheet.addRow(HEADERS);
     hRow.height = 30; // Increase height for wrapped text
     hRow.eachCell((cell) => {
@@ -357,9 +368,11 @@ export const exportPaymentPerCollectorDaily = async (
         : d.paidStartIndex === d.paidEndIndex 
           ? `${d.paidStartIndex}` 
           : `${d.paidStartIndex}-${d.paidEndIndex}`;
+      // kupon pulang is currently not available in data; default to 0 (placeholder)
+      const kuponPulang = (d.couponCount || 0) - (d.paidCount || 0);
       const row = sheet.addRow([
         idx + 1, d.customerName, d.contractRef, range,
-        d.couponCount, d.paidCount, d.dailyAmount, d.totalAmount, d.statusLabel,
+        d.paidCount, kuponPulang, d.dailyAmount, d.totalAmount, d.statusLabel,
       ]);
       row.eachCell((cell, col) => {
         cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -367,11 +380,11 @@ export const exportPaymentPerCollectorDaily = async (
         // Wrap text untuk Kode Kontrak
         if (col === 3) cell.alignment = { horizontal: 'center', wrapText: true };
         // Center alignment untuk: No, No Kupon, Jumlah Kupon, Kupon Dibayar
-        if (col === 1 || col === 4 || col === 5 || col === 6) cell.alignment = { horizontal: 'center' };
-        // Number format untuk Jumlah Kupon dan Kupon Dibayar
+        if (col === 1 || col === 4 || col === 5 || col === 6 || col === 7) cell.alignment = { horizontal: 'center' };
+        // Number format untuk Kupon Dibayar dan Kupon Pulang
         if (col === 5 || col === 6) cell.numFmt = '#,##0';
         // Kupon Dibayar cell: colored background based on payment status
-        if (col === 6) {
+        if (col === 5) {
           // Determine payment status: not_paid, partial, or paid_full
           if (d.paidCount === 0) {
             // Tidak bayar: Merah

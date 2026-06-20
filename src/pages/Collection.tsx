@@ -316,7 +316,7 @@ export default function Collection() {
                       const daily = h.credit_contracts?.daily_installment_amount || 0;
                       return { ...h, _paidInRange: paidInRange, _unpaidInRange: unpaidInRange, _unpaidAmount: unpaidInRange * daily };
                     });
-                    exportHandoverPerCollectorDaily(enriched as any, selectedDate, contractStatusMap as any);
+                    exportHandoverPerCollectorDaily(enriched as any, selectedDate);
                     toast.success("Export serah terima per kolektor berhasil");
                   } catch (error) {
                     toast.error("Gagal export serah terima per kolektor");
