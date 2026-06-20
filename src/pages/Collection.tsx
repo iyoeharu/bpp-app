@@ -25,6 +25,7 @@ import { addToQueue } from "@/lib/offlineQueue";
 import { notifyQueueUpdated } from "@/hooks/useOfflineQueue";
 import { exportHandoverPerCollectorDaily } from "@/lib/exportHandoverPerCollectorDaily";
 import { exportPaymentPerCollectorDaily } from "@/lib/exportPaymentPerCollectorDaily";
+import { useContractStatusMap } from '@/hooks/useContractStatusMap';
 
 export default function Collection() {
   // Manifest state (declared first so hooks below can use them)
@@ -40,6 +41,7 @@ export default function Collection() {
   const createBulkPayment = useCreateBulkPayment();
   const createHandover = useCreateCouponHandover();
   const { data: handovers, isLoading: handoversLoading } = useCouponHandovers(selectedDate);
+  const { data: contractStatusMap } = useContractStatusMap();
   // Selected contract id for payment form (lifted state to allow selection from search results)
   const [paymentSelectedContract, setPaymentSelectedContract] = useState("");
   // Sort states per tab
@@ -258,7 +260,7 @@ export default function Collection() {
                     return;
                   }
                   try {
-                    exportPaymentPerCollectorDaily(payments, contracts || [], selectedDate, handovers || []);
+                    exportPaymentPerCollectorDaily(payments, contracts || [], selectedDate, handovers || [], contractStatusMap as any);
                     toast.success("Export pembayaran per kolektor berhasil");
                   } catch (error) {
                     toast.error("Gagal export pembayaran per kolektor");
@@ -314,7 +316,7 @@ export default function Collection() {
                       const daily = h.credit_contracts?.daily_installment_amount || 0;
                       return { ...h, _paidInRange: paidInRange, _unpaidInRange: unpaidInRange, _unpaidAmount: unpaidInRange * daily };
                     });
-                    exportHandoverPerCollectorDaily(enriched as any, selectedDate);
+                    exportHandoverPerCollectorDaily(enriched as any, selectedDate, contractStatusMap as any);
                     toast.success("Export serah terima per kolektor berhasil");
                   } catch (error) {
                     toast.error("Gagal export serah terima per kolektor");

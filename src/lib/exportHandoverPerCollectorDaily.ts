@@ -43,24 +43,95 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
   workbook.creator = 'Management System Kredit';
   workbook.created = new Date();
 
-  // Group handovers by collector
+  // Group and MERGE handovers by collector and contract so multiple handovers
+  // for the same contract (and same collector) become a single detail row.
   const byCollector = new Map<string, CollectorDailySummary>();
-  
-  handovers.forEach((h) => {
-    if (!byCollector.has(h.collector_id)) {
-      byCollector.set(h.collector_id, {
-        collector_id: h.collector_id,
-        collector_name: h.collectors?.name || 'Unknown',
-        collector_code: h.collectors?.collector_code || '-',
-        handovers: [],
-        total_sisa_kupon: 0,
-        total_sisa_nominal: 0,
-      });
-    }
-    const summary = byCollector.get(h.collector_id)!;
-    summary.handovers.push(h);
-    summary.total_sisa_kupon += h.coupon_count;
-    summary.total_sisa_nominal += (h.coupon_count * (h.credit_contracts?.daily_installment_amount || 0));
+
+  // temp map: collectorId -> { collector info, detailsMap: contractId -> merged entry }
+  const temp = new Map<string, { collector_id: string; collector_name: string; collector_code: string; detailsMap: Map<string, any> }>();
+
+  handovers
+    .filter((h) => !selectedDate || h.handover_date === selectedDate)
+    .forEach((h) => {
+      const collectorId = h.collector_id;
+      const collectorName = h.collectors?.name || 'Unknown';
+      const collectorCode = h.collectors?.collector_code || '-';
+      if (!temp.has(collectorId)) {
+        temp.set(collectorId, { collector_id: collectorId, collector_name: collectorName, collector_code: collectorCode, detailsMap: new Map() });
+      }
+      const t = temp.get(collectorId)!;
+
+      const contractId = h.contract_id;
+      const contractRef = h.credit_contracts?.contract_ref || '-';
+      const customerName = h.credit_contracts?.customers?.name || '-';
+      const dailyAmount = h.credit_contracts?.daily_installment_amount || 0;
+
+      if (!t.detailsMap.has(contractId)) {
+        // initial merged entry
+        t.detailsMap.set(contractId, {
+          contract_id: contractId,
+          credit_contracts: {
+            contract_ref: contractRef,
+            daily_installment_amount: dailyAmount,
+            customers: { name: customerName },
+          },
+          start_index: h.start_index,
+          end_index: h.end_index,
+          coupon_count: h.coupon_count,
+        });
+      } else {
+        // merge into existing
+        const ex = t.detailsMap.get(contractId)!;
+        ex.start_index = Math.min(ex.start_index, h.start_index);
+        ex.end_index = Math.max(ex.end_index, h.end_index);
+        ex.coupon_count = (ex.coupon_count || 0) + (h.coupon_count || 0);
+        // ensure dailyAmount and contract_ref are present (assume consistent)
+        if (!ex.credit_contracts.daily_installment_amount) ex.credit_contracts.daily_installment_amount = dailyAmount;
+        if (!ex.credit_contracts.contract_ref) ex.credit_contracts.contract_ref = contractRef;
+      }
+    });
+
+  // convert temp into byCollector with merged handovers array and totals
+  temp.forEach((v, collectorId) => {
+    const handoverArr: EnrichedHandover[] = [];
+    let totalKupon = 0;
+    let totalNominal = 0;
+    v.detailsMap.forEach((md) => {
+      const daily = md.credit_contracts?.daily_installment_amount || 0;
+      const merged: EnrichedHandover = {
+        id: md.contract_id || md.contract_id || '',
+        collector_id: collectorId,
+        contract_id: md.contract_id,
+        coupon_count: md.coupon_count,
+        start_index: md.start_index,
+        end_index: md.end_index,
+        handover_date: selectedDate,
+        notes: null,
+        created_at: new Date().toISOString(),
+        collectors: { name: v.collector_name, collector_code: v.collector_code },
+        credit_contracts: {
+          contract_ref: md.credit_contracts.contract_ref,
+          daily_installment_amount: daily,
+          current_installment_index: 0,
+          tenor_days: 0,
+          status: '',
+          customers: { name: md.credit_contracts.customers?.name || '-' },
+          sales_agents: null,
+        },
+      } as EnrichedHandover;
+      handoverArr.push(merged);
+      totalKupon += md.coupon_count || 0;
+      totalNominal += (md.coupon_count || 0) * daily;
+    });
+
+    byCollector.set(collectorId, {
+      collector_id: collectorId,
+      collector_name: v.collector_name,
+      collector_code: v.collector_code,
+      handovers: handoverArr,
+      total_sisa_kupon: totalKupon,
+      total_sisa_nominal: totalNominal,
+    });
   });
 
   // Create summary sheet (all collectors)

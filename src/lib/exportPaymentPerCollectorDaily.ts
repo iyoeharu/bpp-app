@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs';
 import type { PaymentWithRelations } from '@/hooks/usePayments';
 import type { CouponHandover } from '@/hooks/useCouponHandovers';
+import { getStatusLabel, type ContractStatus } from '@/lib/statusCalculation';
+import type { ContractStatusInfo } from '@/hooks/useContractStatusMap';
 
 interface PaymentDetail {
   contractId: string;
@@ -14,7 +16,7 @@ interface PaymentDetail {
   paidCount: number;         // kupon dibayar
   dailyAmount: number;
   totalAmount: number;       // tertagih (paidCount * dailyAmount)
-  status: 'lancar' | 'kurang_lancar' | 'macet' | 'lunas' | 'returned';
+  status: 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet' | 'lunas' | 'returned';
   statusLabel: string;
 }
 
@@ -39,6 +41,7 @@ const PAYMENT_STATUS_FILLS: Record<string, { bg: string; fg: string }> = {
 
 // Color tokens for status cells
 const STATUS_FILLS: Record<PaymentDetail['status'], { bg: string; fg: string }> = {
+  sangat_lancar:  { bg: 'FFEBF8E6', fg: 'FF0A7A2A' }, // light green (very punctual)
   lancar:        { bg: 'FFC6EFCE', fg: 'FF006100' }, // green
   kurang_lancar: { bg: 'FFFFEB9C', fg: 'FF9C5700' }, // yellow
   macet:         { bg: 'FFFFC7CE', fg: 'FF9C0006' }, // red
@@ -59,6 +62,8 @@ function computeStatus(contract: any): { status: PaymentDetail['status']; label:
   const daysElapsed = Math.max(1, Math.floor((today.getTime() - createdAt.getTime()) / 86400000));
   const cur = contract.current_installment_index || 0;
   const ratio = cur > 0 ? daysElapsed / cur : 999;
+  // sangat_lancar: pembayaran sesuai ekspektasi atau lebih cepat (tidak pernah terlambat)
+  if (ratio <= 1.0) return { status: 'sangat_lancar', label: 'Sangat Lancar' };
   if (ratio <= 1.2) return { status: 'lancar', label: 'Lancar' };
   if (ratio <= 2.0) return { status: 'kurang_lancar', label: 'Kurang Lancar' };
   return { status: 'macet', label: 'Macet' };
@@ -68,7 +73,8 @@ export const exportPaymentPerCollectorDaily = async (
   payments: PaymentWithRelations[],
   contracts: any[],
   selectedDate: string,
-  handovers?: CouponHandover[]
+  handovers?: CouponHandover[],
+  contractStatusMap?: Map<string, ContractStatusInfo>
 ) => {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Management System Kredit';
@@ -86,7 +92,18 @@ export const exportPaymentPerCollectorDaily = async (
   };
 
   if (handovers && handovers.length > 0) {
-    // Filter handovers to selected date already done by hook; otherwise filter here
+    // Merge handovers per collector+contract so multiple handovers for the
+    // same contract are combined into a single detail row in the Excel.
+    // We'll build a temporary map: collectorId -> (contractId -> merged detail)
+    const tempCollectorMap = new Map<string, { collectorId: string; collectorName: string; collectorCode: string; detailsMap: Map<string, PaymentDetail> }>();
+
+    const ensureTempCollector = (id: string, name: string, code: string) => {
+      if (!tempCollectorMap.has(id)) {
+        tempCollectorMap.set(id, { collectorId: id, collectorName: name, collectorCode: code, detailsMap: new Map() });
+      }
+      return tempCollectorMap.get(id)!;
+    };
+
     handovers
       .filter((h) => !selectedDate || h.handover_date === selectedDate)
       .forEach((h) => {
@@ -104,31 +121,85 @@ export const exportPaymentPerCollectorDaily = async (
         const paidCount = Math.max(0, paidEndIndex - paidStartIndex + 1);
         const totalAmount = paidCount * dailyAmount;
 
-        const merged = {
+        const mergedContract = {
           ...contract,
           current_installment_index: currentIndex,
           tenor_days: h.credit_contracts?.tenor_days ?? contract?.tenor_days,
           status: h.credit_contracts?.status ?? contract?.status,
         };
-        const { status, label } = computeStatus(merged);
+        // Prefer authoritative status from contractStatusMap (riwayat pelanggan)
+        let status: PaymentDetail['status'];
+        let label: string;
+        const cs = contractStatusMap?.get(h.contract_id);
+        if (cs) {
+          const mapStatus = (s: ContractStatus): PaymentDetail['status'] => {
+            if (s === 'completed') return 'lunas';
+            if (s === 'sangat_lancar' || s === 'lancar') return 'lancar';
+            if (s === 'kurang_lancar') return 'kurang_lancar';
+            return 'macet';
+          };
+          status = mapStatus(cs.status);
+          label = getStatusLabel(cs.status);
+        } else {
+          const computed = computeStatus(mergedContract);
+          status = computed.status;
+          label = computed.label;
+        }
 
-        const group = ensureCollector(collectorId, collectorName, collectorCode);
-        group.details.push({
-          contractId: h.contract_id,
-          customerName,
-          contractRef,
-          startIndex: h.start_index,
-          endIndex: h.end_index,
-          paidStartIndex,
-          paidEndIndex,
-          couponCount: h.coupon_count,
-          paidCount,
-          dailyAmount,
-          totalAmount,
-          status,
-          statusLabel: label,
-        });
+        const tempCollector = ensureTempCollector(collectorId, collectorName, collectorCode);
+        const dm = tempCollector.detailsMap;
+        const key = h.contract_id;
+        if (!dm.has(key)) {
+          dm.set(key, {
+            contractId: h.contract_id,
+            customerName,
+            contractRef,
+            startIndex: h.start_index,
+            endIndex: h.end_index,
+            paidStartIndex,
+            paidEndIndex,
+            couponCount: h.coupon_count,
+            paidCount,
+            dailyAmount,
+            totalAmount,
+            status,
+            statusLabel: label,
+          });
+        } else {
+          // merge into existing entry
+          const ex = dm.get(key)!;
+          ex.startIndex = Math.min(ex.startIndex, h.start_index);
+          ex.endIndex = Math.max(ex.endIndex, h.end_index);
+          ex.paidStartIndex = ex.paidStartIndex ? Math.min(ex.paidStartIndex, paidStartIndex) : paidStartIndex;
+          ex.paidEndIndex = Math.max(ex.paidEndIndex, paidEndIndex);
+          ex.couponCount = (ex.couponCount || 0) + (h.coupon_count || 0);
+          ex.paidCount = (ex.paidCount || 0) + paidCount;
+          ex.totalAmount = (ex.totalAmount || 0) + totalAmount;
+          // keep dailyAmount as-is (assume consistent per contract)
+          // recompute status label by using mergedContract (latest info)
+          if (contractStatusMap?.has(h.contract_id)) {
+            const cs2 = contractStatusMap!.get(h.contract_id)!;
+            const mapStatus = (s: ContractStatus): PaymentDetail['status'] => {
+              if (s === 'completed') return 'lunas';
+              if (s === 'sangat_lancar' || s === 'lancar') return 'lancar';
+              if (s === 'kurang_lancar') return 'kurang_lancar';
+              return 'macet';
+            };
+            ex.status = mapStatus(cs2.status);
+            ex.statusLabel = getStatusLabel(cs2.status);
+          } else {
+            const s = computeStatus(mergedContract);
+            ex.status = s.status;
+            ex.statusLabel = s.label;
+          }
+        }
       });
+
+    // Convert tempCollectorMap into collectorMap groups
+    tempCollectorMap.forEach((val) => {
+      const group = ensureCollector(val.collectorId, val.collectorName, val.collectorCode);
+      val.detailsMap.forEach((pd) => group.details.push(pd));
+    });
   } else {
     // Fallback: build from payments
     const map = new Map<string, PaymentDetail & { _collectorId: string; _collectorName: string; _collectorCode: string; _indices: number[] }>();
