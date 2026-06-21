@@ -86,8 +86,11 @@ const fetchOmsetDetails = async (
   let total_omset = 0;
 
   (contracts || []).forEach((c: any) => {
-  const modal = Number(c.omset || 0);
+  // Note: `c.omset` now stores the total product price (harga produk).
+  // The displayed "modal awal" should be harga produk - DP (as per Contracts semantics).
+  const totalProducts = Number(c.omset || 0);
   const dp = Number(c.dp || 0);
+  const modal = Math.max(0, totalProducts - dp);
   const omset = Number(c.total_loan_amount || 0);
   const profit = omset - modal;
   total_modal += modal;

@@ -1139,7 +1139,28 @@ export default function Dashboard() {
       title={omsetDetailScope === 'monthly'
         ? `Detail Omset — ${format(selectedMonth, 'MMMM yyyy', { locale: idLocale })}`
         : `Detail Omset — Tahun ${selectedYear.getFullYear()}`}
-      data={omsetDetailScope === 'monthly' ? omsetMonthly : omsetYearly}
+      // Enrich dialog data with canonical contract fields from `contracts` when available
+      data={(() => {
+        const source = omsetDetailScope === 'monthly' ? omsetMonthly : omsetYearly;
+        if (!source || !Array.isArray(source)) return source;
+        return source.map((item: any) => {
+          // Try to find canonical contract by id or contract_ref
+          const contract = contracts?.find((c: any) => c.id === item.contract_id || c.id === item.id || c.contract_ref === item.contract_ref);
+          if (!contract) return item;
+          return {
+            ...item,
+            // prefer canonical fields when present
+            contract_ref: contract.contract_ref ?? item.contract_ref,
+            start_date: contract.start_date ?? item.start_date,
+            customers: contract.customers ?? item.customers,
+            modal: (contract as any).omset ?? item.modal,
+            omset: contract.total_loan_amount ?? item.omset,
+            tenor_days: contract.tenor_days ?? item.tenor_days,
+            daily_installment_amount: contract.daily_installment_amount ?? item.daily_installment_amount,
+            status: contract.status ?? item.status,
+          };
+        });
+      })()}
     />
 
     <DpDetailDialog
