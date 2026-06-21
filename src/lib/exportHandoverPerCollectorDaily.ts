@@ -36,7 +36,7 @@ const HEADERS = [
 ];
 
 // Reduced widths to encourage text wrapping for multi-word headers
-const COL_WIDTHS = [5, 10, 14, 12, 10, 15, 16];
+const COL_WIDTHS = [5, 14, 9, 12, 10, 15, 16];
 
 export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandover[], selectedDate: string) => {
   const workbook = new ExcelJS.Workbook();
@@ -138,10 +138,10 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
   const summarySheet = workbook.addWorksheet('Ringkasan');
   
   // Title
-  summarySheet.mergeCells('A1:H1');
+  summarySheet.mergeCells('A1:G1');
   const summaryTitleCell = summarySheet.getCell('A1');
   summaryTitleCell.value = 'LAPORAN SERAH TERIMA KUPON - RINGKASAN PER KOLEKTOR';
-  summaryTitleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  summaryTitleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
   summaryTitleCell.alignment = { horizontal: 'center' };
   summaryTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
@@ -149,7 +149,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
   summarySheet.mergeCells('A2:H2');
   const summaryDateCell = summarySheet.getCell('A2');
   summaryDateCell.value = `Tanggal: ${new Date(selectedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`;
-  summaryDateCell.font = { italic: true, size: 14 };
+  summaryDateCell.font = { italic: true, size: 12 };
   summaryDateCell.alignment = { horizontal: 'center' };
 
   summarySheet.addRow([]);
@@ -159,7 +159,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
   const summaryHRow = summarySheet.addRow(summaryHeaders);
   summaryHRow.height = 28; // Increase height for wrapped text
   summaryHRow.eachCell((cell) => {
-    cell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -192,7 +192,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     const summaryRow = summarySheet.addRow(summaryRowValues);
     summaryRow.eachCell((cell, colNum) => {
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-      cell.font = { size: 14 };
+      cell.font = { size: 12 };
       if ([4].includes(colNum)) {
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'center' };
@@ -227,7 +227,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
   sheet.mergeCells('A1:H1');
   const titleCell = sheet.getCell('A1');
   titleCell.value = `LAPORAN SERAH TERIMA KUPON - ${collector_name.toUpperCase()}`;
-  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  titleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
     titleCell.alignment = { horizontal: 'center' };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
@@ -245,7 +245,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     const konsumenCountForCollector = customerSetForCollector.size;
 
     dateCell.value = `Tanggal: ${new Date(selectedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Kolektor: ${collector_name} (${collector_code}) | Jumlah Konsumen: ${konsumenCountForCollector}`;
-  dateCell.font = { italic: true, size: 14 };
+  dateCell.font = { italic: true, size: 12 };
     dateCell.alignment = { horizontal: 'left' };
 
     sheet.addRow([]);
@@ -254,7 +254,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     const hRow = sheet.addRow(HEADERS);
     hRow.height = 30; // Increase height for wrapped text
     hRow.eachCell((cell) => {
-      cell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -279,7 +279,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
       const row = sheet.addRow(rowValues);
       row.eachCell((cell, colNum) => {
         cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-        cell.font = { size: 14 };
+        cell.font = { size: 12 };
 
         if ([5].includes(colNum)) {
           cell.numFmt = '#,##0';
@@ -304,7 +304,7 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
 
     const subtotalRow = sheet.addRow(subtotalRowValues);
     subtotalRow.eachCell((cell, colNum) => {
-      cell.font = { bold: true, size: 14 };
+      cell.font = { bold: true, size: 12 };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
