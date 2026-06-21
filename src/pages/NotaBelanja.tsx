@@ -266,6 +266,19 @@ export default function NotaBelanja() {
       .sort((a, b) => b.sisa - a.sisa);
   }, [rows, paidByStore]);
 
+  // Map store -> sorted unique pickup dates from product rows (within period)
+  const pickupDatesByStore = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of rows) {
+      if (!r.store || !r.pickup_date) continue;
+      const arr = m.get(r.store) || [];
+      if (!arr.includes(r.pickup_date)) arr.push(r.pickup_date);
+      m.set(r.store, arr);
+    }
+    for (const [k, v] of m) v.sort();
+    return m;
+  }, [rows]);
+
   const storePayments = useMemo(
     () => payments.filter((p) => p.store === historyDialog.store),
     [payments, historyDialog.store]
@@ -645,11 +658,11 @@ export default function NotaBelanja() {
 
         <TabsContent value="payments">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader>
               <CardTitle className="text-base">Riwayat Pembayaran ({payments.length})</CardTitle>
-              <Button size="sm" onClick={() => openPayDialog("")}>
-                <Plus className="h-4 w-4 mr-1" /> Catat Pembayaran
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                Pencatatan pembayaran dilakukan melalui tombol <span className="font-semibold">Detail</span> pada tab "Per Toko".
+              </p>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border overflow-x-auto">
@@ -659,6 +672,7 @@ export default function NotaBelanja() {
                       <TableHead className="w-12">No</TableHead>
                       <TableHead>Tanggal</TableHead>
                       <TableHead>Toko</TableHead>
+                      <TableHead>Tgl Pengambilan</TableHead>
                       <TableHead>Catatan</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
                     </TableRow>
@@ -666,18 +680,30 @@ export default function NotaBelanja() {
                   <TableBody>
                     {payments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Belum ada pembayaran untuk {periodLabel}.
                         </TableCell>
                       </TableRow>
                     ) : (
                       paymentPagination.paginatedItems.map((p, i) => {
                         const globalIdx = (paymentPagination.currentPage - 1) * 10 + i + 1;
+                        const pickups = pickupDatesByStore.get(p.store) || [];
                         return (
                           <TableRow key={p.id}>
                             <TableCell>{globalIdx}</TableCell>
                             <TableCell>{formatDate(p.payment_date)}</TableCell>
                             <TableCell className="font-medium">{p.store}</TableCell>
+                            <TableCell className="text-xs">
+                              {pickups.length === 0 ? (
+                                <span className="italic text-muted-foreground">belum di isi</span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {pickups.map((d) => (
+                                    <div key={d}>{formatDate(d)}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {p.notes || "-"}
                             </TableCell>
