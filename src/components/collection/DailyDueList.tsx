@@ -379,7 +379,7 @@ export function DailyDueList({
                     <TableHead>Kolektor</TableHead>
                     <TableHead className="text-center">Range Kupon</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Outstanding</TableHead>
+                    <TableHead className="text-center">Sisa</TableHead>
                     <TableHead className="text-right">Total Tagihan</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>

@@ -28,7 +28,7 @@ interface CollectorGroup {
 }
 
 const HEADERS = [
-  'No', 'Konsumen', 'Kode Kontrak', 'No Kupon', 'Kupon Dibayar', 'Kupon Pulang', 'Angsuran', 'Total Tertagih', 'Status'
+  'No', 'Konsumen', 'Kode Kontrak', 'No Kupon', 'Kupon Dibayar', 'Kupon Sisa', 'Angsuran', 'Total Tertagih', 'Status'
 ];
 // Increased widths for better readability, reduced Kode Kontrak with wrap text
 const COL_WIDTHS = [6, 14, 12, 12, 11, 11, 12, 16, 15];
@@ -254,6 +254,8 @@ export const exportPaymentPerCollectorDaily = async (
   const collectorList = Array.from(collectorMap.values()).sort((a, b) => a.collectorName.localeCompare(b.collectorName));
   collectorList.forEach((c) => c.details.sort((a, b) => a.contractRef.localeCompare(b.contractRef)));
 
+  // (No global consumer precompute needed) we'll compute percentages based on target vs collected
+
   // ========= Summary sheet =========
   const summarySheet = workbook.addWorksheet('Ringkasan');
   summarySheet.mergeCells('A1:G1');
@@ -269,7 +271,7 @@ export const exportPaymentPerCollectorDaily = async (
   d.font = { italic: true, size: 12 };
   d.alignment = { horizontal: 'center' };
   summarySheet.addRow([]);
-  const summaryHeaders = ['No', 'Kolektor', 'Kode', 'Konsumen', 'Konsumen (%)', 'Total Dibayar', 'Total Tertagih'];
+  const summaryHeaders = ['No', 'Kolektor', 'Kode', 'Target Tertagih', 'Tertagih (%)', 'Total Dibayar', 'Total Tertagih'];
   const sh = summarySheet.addRow(summaryHeaders);
   sh.height = 28; // Increase height for wrapped text
   sh.eachCell((cell) => {
@@ -281,40 +283,26 @@ export const exportPaymentPerCollectorDaily = async (
 
   collectorList.forEach((c, i) => {
     const totalCoupons = c.details.reduce((s, x) => s + x.couponCount, 0);
-    const totalPaid = c.details.reduce((s, x) => s + x.paidCount, 0);
-    const totalAmount = c.details.reduce((s, x) => s + x.totalAmount, 0);
-    // compute distinct consumers: acuan adalah nomor HP (phone_number), fallback ke customerName
-    const customerSet = new Set<string>();
-    c.details.forEach((d) => {
-      const contractObj = contracts.find((ct) => ct.id === d.contractId);
-      const phoneNumber = contractObj?.customers?.phone_number || (d.customerName || '-').trim();
-      const normalizedValue = String(phoneNumber).trim().toLowerCase();
-      customerSet.add(normalizedValue);
-    });
-    const konsumenCount = customerSet.size;
-    // compute percentage of consumers for this collector relative to total consumers across all collectors
-    // first compute total consumers across all collectors (done once outside loop) - calculate here
-    const totalConsumersAll = Array.from(collectorList).reduce((acc, g) => {
-      const set = new Set<string>();
-      g.details.forEach((dd) => {
-        const contractObj = contracts.find((ct) => ct.id === dd.contractId);
-        const phoneNumber = contractObj?.customers?.phone_number || (dd.customerName || '-').trim();
-        set.add(String(phoneNumber).trim().toLowerCase());
-      });
-      return acc + set.size;
-    }, 0);
-    const percent = totalConsumersAll > 0 ? Math.round((konsumenCount / totalConsumersAll) * 100) : 0;
+    const totalPaidCount = c.details.reduce((s, x) => s + x.paidCount, 0);
+    const totalCollectedAmount = c.details.reduce((s, x) => s + x.totalAmount, 0);
+    // compute total target tertagih: sum(couponCount * dailyAmount)
+    const totalTargetAmount = c.details.reduce((s, x) => s + ((x.couponCount || 0) * (x.dailyAmount || 0)), 0);
+    const percent = totalTargetAmount > 0 ? Math.round((totalCollectedAmount / totalTargetAmount) * 100) : 0;
 
-    const r = summarySheet.addRow([i + 1, c.collectorName, c.collectorCode, konsumenCount, `${percent}%`, totalPaid, totalAmount]);
+    const r = summarySheet.addRow([i + 1, c.collectorName, c.collectorCode, totalTargetAmount, `${percent}%`, totalPaidCount, totalCollectedAmount]);
     r.eachCell((cell, col) => {
       cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
       cell.font = { size: 12 };
       if (col === 1) cell.alignment = { horizontal: 'center' };
+      // Target (col 4) - currency
+      else if (col === 4) { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: 'right' }; }
+      // Total Dibayar (col 6) - count
       else if (col === 6) { cell.numFmt = '#,##0'; cell.alignment = { horizontal: 'center' }; }
+      // Total Tertagih (col 7) - currency
       else if (col === 7) { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: 'right' }; }
     });
   });
-  summarySheet.columns = [5, 12, 12, 12, 12, 12, 20].map((w) => ({ width: w }));
+  summarySheet.columns = [5, 20, 12, 18, 12, 12, 20].map((w) => ({ width: w }));
 
   // ========= Per-collector detail sheets =========
   const usedNames = new Set<string>();
@@ -347,7 +335,11 @@ export const exportPaymentPerCollectorDaily = async (
     });
     const konsumenCountForCollector = customerSetForCollector.size;
 
-    dd.value = `Tanggal: ${new Date(selectedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Kolektor: ${c.collectorName} (${c.collectorCode}) | Jumlah Konsumen: ${konsumenCountForCollector}`;
+    // Persentase per kolektor: berdasarkan total target tertagih vs yang sudah tertagih
+    const totalCollectedForCollector = c.details.reduce((s, x) => s + (x.totalAmount || 0), 0);
+    const totalTargetForCollector = c.details.reduce((s, x) => s + ((x.couponCount || 0) * (x.dailyAmount || 0)), 0);
+    const percent = totalTargetForCollector > 0 ? Math.round((totalCollectedForCollector / totalTargetForCollector) * 100) : 0;
+    dd.value = `Tanggal: ${new Date(selectedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} | Kolektor: ${c.collectorName} (${c.collectorCode}) | Jumlah Konsumen: ${konsumenCountForCollector} | Persentase: ${percent}%`;
     dd.font = { italic: true, size: 12 };
     dd.alignment = { horizontal: 'left' };
     sheet.addRow([]);
@@ -363,16 +355,18 @@ export const exportPaymentPerCollectorDaily = async (
     const startRow = hRow.number + 1;
 
     c.details.forEach((d, idx) => {
-      const range = d.paidCount === 0 
-        ? '0' 
-        : d.paidStartIndex === d.paidEndIndex 
-          ? `${d.paidStartIndex}` 
-          : `${d.paidStartIndex}-${d.paidEndIndex}`;
-      // kupon pulang is currently not available in data; default to 0 (placeholder)
-      const kuponPulang = (d.couponCount || 0) - (d.paidCount || 0);
+      // No Kupon: range dari serah terima (handover) — tunjukkan startIndex-endIndex
+      // (menampilkan kupon yang diserahterimakan, terbayar atau belum). Jika tidak ada kupon, tampilkan '0'.
+      const range = (d.couponCount || 0) === 0
+        ? '0'
+        : d.startIndex === d.endIndex
+          ? `${d.startIndex}`
+          : `${d.startIndex}-${d.endIndex}`;
+      // kupon sisa (belum dibayar) = total kupon handover - paidCount
+      const kuponSisa = Math.max(0, (d.couponCount || 0) - (d.paidCount || 0));
       const row = sheet.addRow([
         idx + 1, d.customerName, d.contractRef, range,
-        d.paidCount, kuponPulang, d.dailyAmount, d.totalAmount, d.statusLabel,
+        d.paidCount, kuponSisa, d.dailyAmount, d.totalAmount, d.statusLabel,
       ]);
       row.eachCell((cell, col) => {
         cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };

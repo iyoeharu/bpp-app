@@ -514,16 +514,27 @@ export default function NotaBelanja() {
                               {formatRupiah(r.price || 0)}
                             </TableCell>
                             <TableCell className="text-right">
-                              {r.status === "hutang" && r.store ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => openPayDialog(r.store as string, Number(r.price || 0))}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" /> Bayar
-                                </Button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">-</span>
-                              )}
+                              {(() => {
+                                if (!r.store || r.status !== 'hutang') return <span className="text-xs text-muted-foreground">-</span>;
+                                // compute total hutang for this store in current period
+                                const storeHutangTotal = rows
+                                  .filter((rr) => rr.store === r.store && rr.status === 'hutang')
+                                  .reduce((s, it) => s + Number(it.price || 0), 0);
+                                const paidForStore = paidByStore.get(r.store) || 0;
+                                const sisaForStore = storeHutangTotal - paidForStore;
+                                // show Bayar button only if there's outstanding for the store
+                                if (sisaForStore > 0) {
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => openPayDialog(r.store as string, Number(r.price || 0))}
+                                    >
+                                      <Plus className="h-3 w-3 mr-1" /> Bayar
+                                    </Button>
+                                  );
+                                }
+                                return <span className="text-xs text-muted-foreground">-</span>;
+                              })()}
                             </TableCell>
                           </TableRow>
                         );

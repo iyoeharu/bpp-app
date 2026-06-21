@@ -176,7 +176,8 @@ export default function Contracts() {
   // Auto-compute Modal Awal = total harga produk + DP (read-only)
   useEffect(() => {
     const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
-    const computedModal = totalProducts + (Number(formData.dp) || 0);
+    // New rule: Modal Awal = harga product - DP
+    const computedModal = totalProducts - (Number(formData.dp) || 0);
     setFormData((prev) => (prev.modal === computedModal ? prev : { ...prev, modal: computedModal }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, formData.dp]);
@@ -368,8 +369,8 @@ export default function Contracts() {
       daily_installment_amount: contract.daily_installment_amount,
       start_date: contract.start_date || new Date().toISOString().split("T")[0],
       status: contract.status,
-      // omset yang tersimpan = modal - dp, jadi kembalikan modal awal = omset + dp
-      modal: ((contract as any).omset || 0) + ((contract as any).dp || 0),
+  // omset yang tersimpan = total harga produk; modal = omset - dp per definisi baru
+  modal: ((contract as any).omset || 0) - ((contract as any).dp || 0),
       dp: (contract as any).dp || 0,
       // Convert stored TOTAL keuntungan -> per-day for UI display
       keuntungan: (() => {
@@ -538,6 +539,8 @@ export default function Contracts() {
         });
         if (!note) return;
         const prev = selectedContract;
+        // compute totalProducts from products
+        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const updateRes = await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
@@ -550,7 +553,8 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-          omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+          // store omset as total harga produk (totalProductsForSave)
+          omset: Math.max(0, totalProductsForSave),
           dp: formData.dp || 0,
           _note: note,
         } as any);
@@ -608,6 +612,7 @@ export default function Contracts() {
         toast.success("Kontrak berhasil diperbarui");
       } else {
         // CREATE KONTRAK
+        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const { data: newContract } = await createContract.mutateAsync({
           contract_ref: formData.contract_ref,
           customer_id: formData.customer_id,
@@ -619,7 +624,8 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-          omset: Math.max(0, (formData.modal || 0) - (formData.dp || 0)),
+          // store omset as total harga produk (totalProductsForSave)
+          omset: Math.max(0, totalProductsForSave),
           dp: formData.dp || 0,
         } as any);
         
