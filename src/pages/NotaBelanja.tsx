@@ -266,6 +266,19 @@ export default function NotaBelanja() {
       .sort((a, b) => b.sisa - a.sisa);
   }, [rows, paidByStore]);
 
+  // Map store -> sorted unique pickup dates from product rows (within period)
+  const pickupDatesByStore = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of rows) {
+      if (!r.store || !r.pickup_date) continue;
+      const arr = m.get(r.store) || [];
+      if (!arr.includes(r.pickup_date)) arr.push(r.pickup_date);
+      m.set(r.store, arr);
+    }
+    for (const [k, v] of m) v.sort();
+    return m;
+  }, [rows]);
+
   const storePayments = useMemo(
     () => payments.filter((p) => p.store === historyDialog.store),
     [payments, historyDialog.store]
