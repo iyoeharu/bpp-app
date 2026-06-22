@@ -1205,7 +1205,24 @@ export default function Contracts() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 p-6 pb-4">
-            <DialogTitle>{selectedContract ? "Edit Kontrak" : "Kontrak Kredit Baru"}</DialogTitle>
+            <div className="flex items-start justify-between gap-4">
+              <DialogTitle>{selectedContract ? "Edit Kontrak" : "Kontrak Kredit Baru"}</DialogTitle>
+              <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+                <Label htmlFor="legacy-mode-switch" className="text-xs cursor-pointer">
+                  {legacyMode ? "Mode Lama (input manual)" : "Mode Baru (dengan daftar produk)"}
+                </Label>
+                <Switch
+                  id="legacy-mode-switch"
+                  checked={legacyMode}
+                  onCheckedChange={(v) => setLegacyMode(!!v)}
+                />
+              </div>
+            </div>
+            {legacyMode && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Mode Lama: daftar produk dinonaktifkan, Modal Awal diisi manual. Gunakan untuk input data lama yang nota produknya hilang.
+              </p>
+            )}
           </DialogHeader>
           
           {/* Scrollable Content */}
