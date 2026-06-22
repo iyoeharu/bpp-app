@@ -120,8 +120,22 @@ export default function NotaBelanja() {
   const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   // pickup date now follows contract start_date (read-only)
   const [storePopoverOpen, setStorePopoverOpen] = useState(false);
+
+  // Encode/decode product_ids inside notes field (since DB has no dedicated column)
+  const PIDS_RE = /^\[PIDS:([^\]]*)\]\s?/;
+  const encodeNotes = (ids: string[], notes: string) =>
+    `[PIDS:${ids.join(",")}] ${notes || ""}`.trim();
+  const decodeNotes = (raw: string | null): { ids: string[]; notes: string } => {
+    if (!raw) return { ids: [], notes: "" };
+    const m = raw.match(PIDS_RE);
+    if (!m) return { ids: [], notes: raw };
+    const ids = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+    return { ids, notes: raw.replace(PIDS_RE, "").trim() };
+  };
+
 
   const qc = useQueryClient();
 
