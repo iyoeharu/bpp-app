@@ -326,11 +326,18 @@ export default function NotaBelanja() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allRows, allPayments]);
 
+  const productById = useMemo(() => {
+    const m = new Map<string, NotaProductRow>();
+    for (const r of allRows) m.set(r.id, r);
+    return m;
+  }, [allRows]);
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
+    setSelectedProductIds(new Set());
   };
 
   const openDetailDialog = (store: string) => {
@@ -338,7 +345,9 @@ export default function NotaBelanja() {
     setPayAmount(0);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
+    setSelectedProductIds(new Set());
   };
+
 
   const sisaColor =
     totals.sisa > 0 ? "text-red-600" : totals.sisa < 0 ? "text-emerald-600" : "text-foreground";
