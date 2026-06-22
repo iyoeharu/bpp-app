@@ -1033,7 +1033,8 @@ export default function NotaBelanja() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Tgl Pembayaran</TableHead>
+                  <TableHead>Tgl Pengambilan (Dibayar)</TableHead>
                   <TableHead>Catatan</TableHead>
                   <TableHead className="text-right">Jumlah</TableHead>
                 </TableRow>
@@ -1041,24 +1042,47 @@ export default function NotaBelanja() {
               <TableBody>
                 {storePayments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                       Belum ada pembayaran untuk toko ini di periode ini.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  storePayments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{formatDate(p.payment_date)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {p.notes || "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-blue-600">
-                        {formatRupiah(Number(p.amount))}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  storePayments.map((p) => {
+                    const { ids, notes } = decodeNotes(p.notes);
+                    const paidProducts = ids
+                      .map((id) => productById.get(id))
+                      .filter(Boolean) as NotaProductRow[];
+                    const paidPickups = Array.from(
+                      new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                    ).sort();
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell>{formatDate(p.payment_date)}</TableCell>
+                        <TableCell className="text-xs">
+                          {paidProducts.length === 0 ? (
+                            <span className="italic text-muted-foreground">-</span>
+                          ) : paidPickups.length === 0 ? (
+                            <span className="italic text-muted-foreground">belum di isi</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {paidPickups.map((d) => (
+                                <div key={d}>{formatDate(d)}</div>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {notes || "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-blue-600">
+                          {formatRupiah(Number(p.amount))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
+
             </Table>
           </div>
           <DialogFooter>
