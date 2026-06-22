@@ -322,6 +322,7 @@ export default function Contracts() {
         });
         setProducts([]);
         setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
+        setLegacyMode(false);
         setDialogOpen(true);
         // Remove param from URL
         searchParams.delete('newCustomerId');
