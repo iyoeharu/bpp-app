@@ -629,7 +629,9 @@ export default function Contracts() {
         toast.success("Kontrak berhasil diperbarui");
       } else {
         // CREATE KONTRAK
-        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+        const totalProductsForSave = legacyMode
+          ? Math.max(0, (formData.modal || 0) + (formData.dp || 0))
+          : products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const { data: newContract } = await createContract.mutateAsync({
           contract_ref: formData.contract_ref,
           customer_id: formData.customer_id,
