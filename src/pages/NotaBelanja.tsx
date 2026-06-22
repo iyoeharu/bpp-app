@@ -332,6 +332,17 @@ export default function NotaBelanja() {
     return m;
   }, [allRows]);
 
+  // Set of product IDs that have already been paid (from any prior nota_payment)
+  const paidProductIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of allPayments) {
+      const { ids } = decodeNotes(p.notes);
+      for (const id of ids) s.add(id);
+    }
+    return s;
+  }, [allPayments]);
+
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
