@@ -120,8 +120,22 @@ export default function NotaBelanja() {
   const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   // pickup date now follows contract start_date (read-only)
   const [storePopoverOpen, setStorePopoverOpen] = useState(false);
+
+  // Encode/decode product_ids inside notes field (since DB has no dedicated column)
+  const PIDS_RE = /^\[PIDS:([^\]]*)\]\s?/;
+  const encodeNotes = (ids: string[], notes: string) =>
+    `[PIDS:${ids.join(",")}] ${notes || ""}`.trim();
+  const decodeNotes = (raw: string | null): { ids: string[]; notes: string } => {
+    if (!raw) return { ids: [], notes: "" };
+    const m = raw.match(PIDS_RE);
+    if (!m) return { ids: [], notes: raw };
+    const ids = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+    return { ids, notes: raw.replace(PIDS_RE, "").trim() };
+  };
+
 
   const qc = useQueryClient();
 
@@ -312,11 +326,18 @@ export default function NotaBelanja() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allRows, allPayments]);
 
+  const productById = useMemo(() => {
+    const m = new Map<string, NotaProductRow>();
+    for (const r of allRows) m.set(r.id, r);
+    return m;
+  }, [allRows]);
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
+    setSelectedProductIds(new Set());
   };
 
   const openDetailDialog = (store: string) => {
@@ -324,7 +345,9 @@ export default function NotaBelanja() {
     setPayAmount(0);
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayNotes("");
+    setSelectedProductIds(new Set());
   };
+
 
   const sisaColor =
     totals.sisa > 0 ? "text-red-600" : totals.sisa < 0 ? "text-emerald-600" : "text-foreground";
@@ -670,9 +693,9 @@ export default function NotaBelanja() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">No</TableHead>
-                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Tgl Pembayaran</TableHead>
                       <TableHead>Toko</TableHead>
-                      <TableHead>Tgl Pengambilan</TableHead>
+                      <TableHead>Tgl Pengambilan (Produk Dibayar)</TableHead>
                       <TableHead>Catatan</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
                     </TableRow>
@@ -687,25 +710,33 @@ export default function NotaBelanja() {
                     ) : (
                       paymentPagination.paginatedItems.map((p, i) => {
                         const globalIdx = (paymentPagination.currentPage - 1) * 10 + i + 1;
-                        const pickups = pickupDatesByStore.get(p.store) || [];
+                        const { ids, notes } = decodeNotes(p.notes);
+                        const paidProducts = ids
+                          .map((id) => productById.get(id))
+                          .filter(Boolean) as NotaProductRow[];
+                        const paidPickups = Array.from(
+                          new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                        ).sort();
                         return (
                           <TableRow key={p.id}>
                             <TableCell>{globalIdx}</TableCell>
                             <TableCell>{formatDate(p.payment_date)}</TableCell>
                             <TableCell className="font-medium">{p.store}</TableCell>
                             <TableCell className="text-xs">
-                              {pickups.length === 0 ? (
+                              {paidProducts.length === 0 ? (
+                                <span className="italic text-muted-foreground">-</span>
+                              ) : paidPickups.length === 0 ? (
                                 <span className="italic text-muted-foreground">belum di isi</span>
                               ) : (
                                 <div className="space-y-0.5">
-                                  {pickups.map((d) => (
+                                  {paidPickups.map((d) => (
                                     <div key={d}>{formatDate(d)}</div>
                                   ))}
                                 </div>
                               )}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {p.notes || "-"}
+                              {notes || "-"}
                             </TableCell>
                             <TableCell className="text-right font-semibold text-blue-600">
                               {formatRupiah(Number(p.amount))}
@@ -715,6 +746,7 @@ export default function NotaBelanja() {
                       })
                     )}
                   </TableBody>
+
                 </Table>
               </div>
               <TablePagination
@@ -860,6 +892,7 @@ export default function NotaBelanja() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          {!payDialog.readonly && <TableHead className="h-8 w-10">Pilih</TableHead>}
                           <TableHead className="h-8">Produk</TableHead>
                           <TableHead className="h-8">Kontrak</TableHead>
                           <TableHead className="h-8">Tgl Ambil</TableHead>
@@ -867,22 +900,48 @@ export default function NotaBelanja() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {dialogStoreProducts.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
-                            <TableCell className="py-1.5 text-xs font-mono">
-                              {p.credit_contracts?.contract_ref || "-"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-xs">
-                              {p.pickup_date ? formatDate(p.pickup_date) : <span className="italic text-muted-foreground">belum di isi</span>}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-xs text-right">
-                              {formatRupiah(Number(p.price || 0))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {dialogStoreProducts.map((p) => {
+                          const checked = selectedProductIds.has(p.id);
+                          return (
+                            <TableRow key={p.id}>
+                              {!payDialog.readonly && (
+                                <TableCell className="py-1.5">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 cursor-pointer"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      setSelectedProductIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) next.add(p.id);
+                                        else next.delete(p.id);
+                                        // auto-sum
+                                        const sum = dialogStoreProducts
+                                          .filter((dp) => next.has(dp.id))
+                                          .reduce((s, dp) => s + Number(dp.price || 0), 0);
+                                        setPayAmount(sum);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </TableCell>
+                              )}
+                              <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
+                              <TableCell className="py-1.5 text-xs font-mono">
+                                {p.credit_contracts?.contract_ref || "-"}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs">
+                                {p.pickup_date ? formatDate(p.pickup_date) : <span className="italic text-muted-foreground">belum di isi</span>}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs text-right">
+                                {formatRupiah(Number(p.price || 0))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
+
                   )}
                 </div>
                 <div className="px-3 py-2 border-t grid grid-cols-3 gap-2 text-xs">
@@ -943,8 +1002,9 @@ export default function NotaBelanja() {
                     store: payDialog.store.trim(),
                     amount: payAmount,
                     payment_date: payDate,
-                    notes: payNotes.trim(),
+                    notes: encodeNotes(Array.from(selectedProductIds), payNotes.trim()),
                   })
+
                 }
               >
                 {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
@@ -973,7 +1033,8 @@ export default function NotaBelanja() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Tgl Pembayaran</TableHead>
+                  <TableHead>Tgl Pengambilan (Dibayar)</TableHead>
                   <TableHead>Catatan</TableHead>
                   <TableHead className="text-right">Jumlah</TableHead>
                 </TableRow>
@@ -981,24 +1042,47 @@ export default function NotaBelanja() {
               <TableBody>
                 {storePayments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                       Belum ada pembayaran untuk toko ini di periode ini.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  storePayments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{formatDate(p.payment_date)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {p.notes || "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-blue-600">
-                        {formatRupiah(Number(p.amount))}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  storePayments.map((p) => {
+                    const { ids, notes } = decodeNotes(p.notes);
+                    const paidProducts = ids
+                      .map((id) => productById.get(id))
+                      .filter(Boolean) as NotaProductRow[];
+                    const paidPickups = Array.from(
+                      new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                    ).sort();
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell>{formatDate(p.payment_date)}</TableCell>
+                        <TableCell className="text-xs">
+                          {paidProducts.length === 0 ? (
+                            <span className="italic text-muted-foreground">-</span>
+                          ) : paidPickups.length === 0 ? (
+                            <span className="italic text-muted-foreground">belum di isi</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {paidPickups.map((d) => (
+                                <div key={d}>{formatDate(d)}</div>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {notes || "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-blue-600">
+                          {formatRupiah(Number(p.amount))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
+
             </Table>
           </div>
           <DialogFooter>
