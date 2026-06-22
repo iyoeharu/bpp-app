@@ -169,12 +169,13 @@ export default function Contracts() {
   // Mode lama: input data lama tanpa daftar produk; Modal Awal diisi manual
   const [legacyMode, setLegacyMode] = useState(false);
 
-  // Auto-sync product_type textarea with product names list
+  // Auto-sync product_type textarea with product names list (kecuali mode lama)
   useEffect(() => {
+    if (legacyMode) return;
     const joined = products.map((p) => p.name).filter(Boolean).join(', ');
     setFormData((prev) => (prev.product_type === joined ? prev : { ...prev, product_type: joined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
+  }, [products, legacyMode]);
 
   // Auto-compute Modal Awal = total harga produk + DP (read-only) — kecuali mode lama
   useEffect(() => {
