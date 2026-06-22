@@ -742,8 +742,8 @@ export default function Contracts() {
         return;
       }
 
-      // Persist product list for new contract
-      await syncContractProducts(newContract.id);
+      // Persist product list for new contract (skip mode lama)
+      if (!legacyMode) await syncContractProducts(newContract.id);
 
 
       // Generate kupon
