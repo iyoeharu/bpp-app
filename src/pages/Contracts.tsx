@@ -660,7 +660,7 @@ export default function Contracts() {
         } else {
           toast.success("Kontrak berhasil dibuat");
         }
-        if (newContract?.id) {
+        if (newContract?.id && !legacyMode) {
           await syncContractProducts(newContract.id);
         }
       }
