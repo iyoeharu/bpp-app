@@ -693,9 +693,9 @@ export default function NotaBelanja() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">No</TableHead>
-                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Tgl Pembayaran</TableHead>
                       <TableHead>Toko</TableHead>
-                      <TableHead>Tgl Pengambilan</TableHead>
+                      <TableHead>Tgl Pengambilan (Produk Dibayar)</TableHead>
                       <TableHead>Catatan</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
                     </TableRow>
@@ -710,25 +710,33 @@ export default function NotaBelanja() {
                     ) : (
                       paymentPagination.paginatedItems.map((p, i) => {
                         const globalIdx = (paymentPagination.currentPage - 1) * 10 + i + 1;
-                        const pickups = pickupDatesByStore.get(p.store) || [];
+                        const { ids, notes } = decodeNotes(p.notes);
+                        const paidProducts = ids
+                          .map((id) => productById.get(id))
+                          .filter(Boolean) as NotaProductRow[];
+                        const paidPickups = Array.from(
+                          new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                        ).sort();
                         return (
                           <TableRow key={p.id}>
                             <TableCell>{globalIdx}</TableCell>
                             <TableCell>{formatDate(p.payment_date)}</TableCell>
                             <TableCell className="font-medium">{p.store}</TableCell>
                             <TableCell className="text-xs">
-                              {pickups.length === 0 ? (
+                              {paidProducts.length === 0 ? (
+                                <span className="italic text-muted-foreground">-</span>
+                              ) : paidPickups.length === 0 ? (
                                 <span className="italic text-muted-foreground">belum di isi</span>
                               ) : (
                                 <div className="space-y-0.5">
-                                  {pickups.map((d) => (
+                                  {paidPickups.map((d) => (
                                     <div key={d}>{formatDate(d)}</div>
                                   ))}
                                 </div>
                               )}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {p.notes || "-"}
+                              {notes || "-"}
                             </TableCell>
                             <TableCell className="text-right font-semibold text-blue-600">
                               {formatRupiah(Number(p.amount))}
@@ -738,6 +746,7 @@ export default function NotaBelanja() {
                       })
                     )}
                   </TableBody>
+
                 </Table>
               </div>
               <TablePagination
