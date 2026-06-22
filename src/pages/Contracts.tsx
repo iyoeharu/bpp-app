@@ -511,11 +511,13 @@ export default function Contracts() {
 
     // Modal Awal otomatis = total harga produk + DP (sudah terisi otomatis, tidak perlu validasi)
 
-    // Validasi tanggal pengambilan per produk wajib diisi
-    const missingPickup = products.find((p) => !p.pickup_date);
-    if (missingPickup) {
-      toast.error(`Tanggal pengambilan wajib diisi untuk produk: ${missingPickup.name}`);
-      return;
+    // Validasi tanggal pengambilan per produk wajib diisi (skip pada mode lama)
+    if (!legacyMode) {
+      const missingPickup = products.find((p) => !p.pickup_date);
+      if (missingPickup) {
+        toast.error(`Tanggal pengambilan wajib diisi untuk produk: ${missingPickup.name}`);
+        return;
+      }
     }
     
     
