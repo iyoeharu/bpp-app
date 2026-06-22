@@ -715,7 +715,11 @@ export default function NotaBelanja() {
                           .map((id) => productById.get(id))
                           .filter(Boolean) as NotaProductRow[];
                         const paidPickups = Array.from(
-                          new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                          new Set(
+                            paidProducts
+                              .map((pp) => pp.pickup_date || pp.credit_contracts?.start_date)
+                              .filter(Boolean) as string[]
+                          )
                         ).sort();
                         return (
                           <TableRow key={p.id}>
@@ -861,10 +865,10 @@ export default function NotaBelanja() {
                 {/* Tanggal Pengambilan Summary */}
                 {(() => {
                   const pickupDates = dialogStoreProducts
-                    .map((p) => p.pickup_date || null)
-                    .filter((d) => d !== null);
+                    .map((p) => p.pickup_date || p.credit_contracts?.start_date || null)
+                    .filter((d) => d !== null && d !== undefined) as string[];
                   const uniqueDates = Array.from(new Set(pickupDates));
-                  const hasNoPickup = dialogStoreProducts.some((p) => !p.pickup_date);
+                  const hasNoPickup = dialogStoreProducts.some((p) => !(p.pickup_date || p.credit_contracts?.start_date));
                   return (
                     <div className="px-3 py-2 border-b bg-blue-50/50">
                       <p className="text-xs font-semibold text-blue-900 mb-1">Tanggal Pengambilan Produk:</p>
@@ -931,7 +935,11 @@ export default function NotaBelanja() {
                                 {p.credit_contracts?.contract_ref || "-"}
                               </TableCell>
                               <TableCell className="py-1.5 text-xs">
-                                {p.pickup_date ? formatDate(p.pickup_date) : <span className="italic text-muted-foreground">belum di isi</span>}
+                                {p.pickup_date || p.credit_contracts?.start_date ? (
+                                  formatDate(p.pickup_date || p.credit_contracts!.start_date!)
+                                ) : (
+                                  <span className="italic text-muted-foreground">belum di isi</span>
+                                )}
                               </TableCell>
                               <TableCell className="py-1.5 text-xs text-right">
                                 {formatRupiah(Number(p.price || 0))}
@@ -1053,7 +1061,11 @@ export default function NotaBelanja() {
                       .map((id) => productById.get(id))
                       .filter(Boolean) as NotaProductRow[];
                     const paidPickups = Array.from(
-                      new Set(paidProducts.map((pp) => pp.pickup_date).filter(Boolean) as string[])
+                      new Set(
+                        paidProducts
+                          .map((pp) => pp.pickup_date || pp.credit_contracts?.start_date)
+                          .filter(Boolean) as string[]
+                      )
                     ).sort();
                     return (
                       <TableRow key={p.id}>
