@@ -395,15 +395,19 @@ export default function Contracts() {
       if (error) {
         console.error('Failed to load contract products:', error);
         setProducts([]);
+        setLegacyMode(true);
       } else {
-        setProducts(((data || []) as any[]).map((p) => ({
+        const loaded = ((data || []) as any[]).map((p) => ({
           id: p.id,
           name: p.name,
           price: Number(p.price || 0),
           status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
           store: p.store || '',
           pickup_date: p.pickup_date || '',
-        })));
+        }));
+        setProducts(loaded);
+        // Tanpa daftar produk → asumsikan data lama
+        setLegacyMode(loaded.length === 0);
       }
     })();
     setDialogOpen(true);
