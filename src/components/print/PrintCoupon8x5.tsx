@@ -30,7 +30,6 @@ interface PrintCoupon8x5Props {
 }
 
 export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
-  
   // --- Inject CSS ---
   React.useEffect(() => {
     const printStyles = `
@@ -262,7 +261,6 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
       existingStyles.forEach(el => el.remove());
     };
   }, []);
-
   // --- Helper Functions ---
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("id-ID", {
@@ -270,16 +268,12 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
     });
   };
 
-  const formatAmount = (amount: number) => {
-    return amount.toLocaleString("id-ID");
-  };
+  const formatAmount = (amount: number) => amount.toLocaleString('id-ID');
 
   const truncateText = (text: string, maxLength: number) => {
-    if (!text) return "";
+    if (!text) return '';
     if (text.length <= maxLength) return text;
-    // New behavior: if text is longer than maxLength, show first maxLength characters
-    // and append ellipsis (ellipsis is outside the maxLength).
-    return text.substring(0, maxLength) + "...";
+    return text.substring(0, maxLength) + '...';
   };
 
   const isUrgentCoupon = (coupon: InstallmentCoupon, tenor: number) => {
@@ -296,18 +290,104 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
     return pages;
   };
 
-  // --- Data Preparation ---
-  // noFakturBase removed; we'll build per-coupon identifier including installment index
-  const displayAddress = contract.customers?.business_address || contract.customers?.address || "-";
-  // Truncated address for printing (max 35 chars)
-  const truncatedAddressForPrint = truncateText(displayAddress, 35);
-  const couponPages = groupCouponsIntoPages(coupons);
-
-  // Constants
-  const REKENING_NUMBER = "7052-0101-4075-532";
-  const KANTOR_NUMBER = "0852 5882 5882";
   // Single source of truth: imported asset from src/assets (resolved & hashed by Vite)
   const bgDataUrl = BG_IMAGE;
+
+  // Diagnostic preload
+  React.useEffect(() => {
+    try {
+      console.debug('[PrintCoupon8x5] resolved BG_IMAGE ->', bgDataUrl);
+      if (bgDataUrl) {
+        const img = new Image();
+        img.src = bgDataUrl;
+        img.onload = () => console.debug('[PrintCoupon8x5] bg image loaded OK');
+        img.onerror = (err) => console.error('[PrintCoupon8x5] bg image failed to load', err, bgDataUrl);
+      }
+    } catch (err) {
+      console.error('[PrintCoupon8x5] preload error', err);
+    }
+  }, [bgDataUrl]);
+
+  // Prepare per-contract values used in rendering
+  const displayAddress = contract.customers?.business_address || contract.customers?.address || '-';
+  const truncatedAddressForPrint = truncateText(displayAddress, 35);
+  const couponPages = groupCouponsIntoPages(coupons);
+  const REKENING_NUMBER = '7052-0101-4075-532';
+  const KANTOR_NUMBER = '0852 5882 5882';
+
+  // Render helper: column-major order (top-to-bottom per column) to force print order "atas -> bawah"
+  const renderCouponsColumnMajor = (pagesCoupons: InstallmentCoupon[]) => {
+    const cols = 3;
+    const rows = 3;
+    const slots = cols * rows;
+    const nodes: JSX.Element[] = [];
+
+    for (let slotIndex = 0; slotIndex < slots; slotIndex++) {
+      const col = Math.floor(slotIndex / rows);
+      const row = slotIndex % rows;
+      const linearIndex = col * rows + row; // column-major index
+      const coupon = pagesCoupons[linearIndex];
+
+      if (!coupon) {
+        nodes.push(
+          <div key={`empty-${slotIndex}`} className="coupon-card empty-card">
+            <div className="empty-card-text">
+              <div>KARTU KOSONG</div>
+              <div style={{ fontSize: '8pt', marginTop: '2mm' }}>Potong sesuai garis</div>
+            </div>
+          </div>
+        );
+        continue;
+      }
+
+      const isUrgent = isUrgentCoupon(coupon, contract.tenor_days);
+
+      nodes.push(
+        <div
+          key={coupon.id}
+          className={`coupon-card ${isUrgent ? 'coupon-urgent' : ''}`}
+          style={bgDataUrl ? { backgroundImage: `url(${bgDataUrl})`, backgroundSize: 'cover', backgroundPosition: 'top center' } : undefined}
+        >
+          {bgDataUrl ? (
+            <img
+              src={bgDataUrl}
+              className="bg-img-layer"
+              alt="background"
+              onError={(e) => console.error('[PrintCoupon8x5] <img> failed to load bg', e, bgDataUrl)}
+              onLoad={() => console.debug('[PrintCoupon8x5] <img> bg loaded')}
+            />
+          ) : (
+            <div className="bg-img-layer" style={{ background: 'linear-gradient(135deg, #87ceeb 0%, #98d8e8 50%, #b0e0e6 100%)', opacity: 0.8 }} />
+          )}
+
+          <div className="content-layer">
+            <div className="title-section">
+              <div className="voucher-title">VOUCHER ANGSURAN</div>
+            </div>
+
+            <div className="content-area">
+              <div className="data-row">
+                <span className="label">No. Kupon</span>
+                <span className="value">: <span className="red-text">{coupon.installment_index}</span>-{contract.tenor_days}{'\u00A0'.repeat(5)}{contract.sales_agents?.agent_code || '-'}{'/'}{contract.collectors?.collector_code || '-'}</span>
+              </div>
+              <div className="data-row"><span className="label">Nama</span><span className="value">: {truncateText(contract.customers?.name || '-', 30)}</span></div>
+              <div className="data-row"><span className="label">No HP</span><span className="value">: {contract.customers?.phone || '-'}</span></div>
+              <div className="data-row"><span className="label">Alamat</span><span className="value value-alamat">: {truncatedAddressForPrint}</span></div>
+              <div className="data-row"><span className="label">Jatuh Tempo</span><span className="value">: {formatDate(coupon.due_date)}</span></div>
+              <div className="data-row"><span className="label label-narrow">Rekening BRI</span><span className="value red-text" style={{ fontWeight: 'bolder' }}>( {REKENING_NUMBER} )</span></div>
+              <div className="data-row"><span className="label">A.N MUHAMMAD ZAYADI</span></div>
+            </div>
+
+            <div className="contract-code">{contract.contract_ref}</div>
+            <div className="right-section"><div className="lbl-besar">Besar Angsuran</div><div className="val-besar">Rp {formatAmount(coupon.amount)}</div></div>
+            <div className="footer">KANTOR / {KANTOR_NUMBER}</div>
+          </div>
+        </div>
+      );
+    }
+
+    return nodes;
+  };
 
   const printContent = (
     <>
@@ -394,106 +474,7 @@ export function PrintCoupon8x5({ coupons, contract }: PrintCoupon8x5Props) {
           }}></div>
           
           <div className="coupon-grid">
-            {Array.from({ length: 9 }, (_, index) => {
-              const coupon = pagesCoupons[index];
-              
-              if (!coupon) {
-                // Render kartu kosong dengan panduan potong
-                return (
-                  <div key={`empty-${index}`} className="coupon-card empty-card">
-                    <div className="empty-card-text">
-                      <div>KARTU KOSONG</div>
-                      <div style={{ fontSize: '8pt', marginTop: '2mm' }}>
-                        Potong sesuai garis
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
-              const isUrgent = isUrgentCoupon(coupon, contract.tenor_days);
-              
-              return (
-                <div key={coupon.id} className={`coupon-card ${isUrgent ? 'coupon-urgent' : ''}`}>
-
-                  {/* Layer 1: Background - use preloaded data URL if available, otherwise CSS fallback */}
-                  {bgDataUrl ? (
-                    <img src={bgDataUrl} className="bg-img-layer" alt="background" />
-                  ) : (
-                    <div 
-                      className="bg-img-layer"
-                      style={{
-                        background: 'linear-gradient(135deg, #87ceeb 0%, #98d8e8 50%, #b0e0e6 100%)',
-                        opacity: 0.8
-                      }}
-                    />
-                  )}
-
-                  {/* Layer 2: Konten Text */}
-                  <div className="content-layer">
-                    {/* Title Section */}
-                    <div className="title-section">
-                      <div className="voucher-title">VOUCHER ANGSURAN</div>
-                    </div>
-
-                    <div className="content-area">
-            <div className="data-row">
-              <span className="label">No. Kupon</span>
-              <span className="value">
-                : <span className="red-text">{coupon.installment_index}</span>-{contract.tenor_days}
-                {'\u00A0'.repeat(5)}
-                {contract.sales_agents?.agent_code || '-'}
-                {'/'}
-                {contract.collectors?.collector_code || '-'}
-              </span>
-            </div>
-            <div className="data-row">
-              <span className="label">Nama</span>
-        <span className="value">: {truncateText(contract.customers?.name || "-", 30)}</span>
-            </div>
-            <div className="data-row">
-              <span className="label">No HP</span>
-              <span className="value">: {contract.customers?.phone || '-'}</span>
-            </div>
-
-                        <div className="data-row">
-                            <span className="label">Alamat</span>
-                            <span className="value value-alamat">: {truncatedAddressForPrint}</span>
-                            
-                        </div>
-
-                        <div className="data-row">
-                            <span className="label">Jatuh Tempo</span>
-                            <span className="value">: {formatDate(coupon.due_date)}</span>
-                        </div>
-
-            {/* Angsuran Ke row removed - included in No, Kupon field as installment/tenor/sales/collector */}
-            <div className="data-row" >
-              <span className="label label-narrow">Rekening BRI</span>
-              <span className="value red-text" style={{fontWeight:'bolder'}} >( {REKENING_NUMBER} )</span>
-            </div>
-            
-            <div className="data-row">
-              <span className="label">A.N MUHAMMAD ZAYADI</span>
-            </div>
-
-                    </div>
-
-                    {/* Contract Code - positioned on the right side */}
-                    <div className="contract-code">
-                        {contract.contract_ref}
-                    </div>
-
-                    <div className="right-section">
-                        <div className="lbl-besar">Besar Angsuran</div>
-                        <div className="val-besar">Rp {formatAmount(coupon.amount)}</div>
-                    </div>
-
-                    <div className="footer">KANTOR / {KANTOR_NUMBER}</div>
-                  </div>
-                </div>
-              );
-            })}
+            {renderCouponsColumnMajor(pagesCoupons)}
           </div>
         </div>
       ))}
