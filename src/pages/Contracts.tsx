@@ -1444,11 +1444,14 @@ export default function Contracts() {
                     <Textarea
                       id="product_type"
                       value={formData.product_type}
-                      readOnly
-                      placeholder="Otomatis terisi dari Daftar Barang / Produk di bawah"
-                      className="max-h-40 resize-y overflow-auto bg-muted/40"
+                      readOnly={!legacyMode}
+                      onChange={(e) => legacyMode && setFormData({ ...formData, product_type: e.target.value })}
+                      placeholder={legacyMode ? "Tulis jenis produk secara manual" : "Otomatis terisi dari Daftar Barang / Produk di bawah"}
+                      className={cn("max-h-40 resize-y overflow-auto", !legacyMode && "bg-muted/40")}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Otomatis mengikuti nama produk pada Daftar Barang / Produk.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {legacyMode ? "Mode Lama: isi manual (opsional)." : "Otomatis mengikuti nama produk pada Daftar Barang / Produk."}
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="tenor_days">
