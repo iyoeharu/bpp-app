@@ -617,8 +617,10 @@ export default function Contracts() {
           }
         }
 
-        // Sync product list (replace all)
-        await syncContractProducts(selectedContract.id);
+        // Sync product list (replace all) — skip pada mode lama agar daftar produk lama tidak dihapus
+        if (!legacyMode) {
+          await syncContractProducts(selectedContract.id);
+        }
 
         // Refresh selectedContract di state lokal supaya preview/print pakai data baru
         if (updateRes?.data) {
