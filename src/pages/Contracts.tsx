@@ -71,6 +71,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { useAdminNote } from "@/contexts/AdminNoteContext";
 
 export default function Contracts() {
