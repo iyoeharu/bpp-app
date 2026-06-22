@@ -993,8 +993,9 @@ export default function NotaBelanja() {
                     store: payDialog.store.trim(),
                     amount: payAmount,
                     payment_date: payDate,
-                    notes: payNotes.trim(),
+                    notes: encodeNotes(Array.from(selectedProductIds), payNotes.trim()),
                   })
+
                 }
               >
                 {createPayment.isPending ? "Menyimpan..." : "Simpan Pembayaran"}
