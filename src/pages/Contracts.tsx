@@ -176,14 +176,15 @@ export default function Contracts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
-  // Auto-compute Modal Awal = total harga produk + DP (read-only)
+  // Auto-compute Modal Awal = total harga produk + DP (read-only) — kecuali mode lama
   useEffect(() => {
+    if (legacyMode) return;
     const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
     // New rule: Modal Awal = harga product - DP
     const computedModal = totalProducts - (Number(formData.dp) || 0);
     setFormData((prev) => (prev.modal === computedModal ? prev : { ...prev, modal: computedModal }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, formData.dp]);
+  }, [products, formData.dp, legacyMode]);
 
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
