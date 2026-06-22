@@ -552,8 +552,10 @@ export default function Contracts() {
         });
         if (!note) return;
         const prev = selectedContract;
-        // compute totalProducts from products
-        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+        // compute totalProducts from products (mode lama: pakai modal + dp manual)
+        const totalProductsForSave = legacyMode
+          ? Math.max(0, (formData.modal || 0) + (formData.dp || 0))
+          : products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const updateRes = await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
