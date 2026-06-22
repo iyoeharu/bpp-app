@@ -332,6 +332,17 @@ export default function NotaBelanja() {
     return m;
   }, [allRows]);
 
+  // Set of product IDs that have already been paid (from any prior nota_payment)
+  const paidProductIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of allPayments) {
+      const { ids } = decodeNotes(p.notes);
+      for (const id of ids) s.add(id);
+    }
+    return s;
+  }, [allPayments]);
+
+
   const openPayDialog = (store: string, suggested = 0) => {
     setPayDialog({ open: true, store, readonly: false });
     setPayAmount(suggested);
@@ -905,16 +916,20 @@ export default function NotaBelanja() {
                       </TableHeader>
                       <TableBody>
                         {dialogStoreProducts.map((p) => {
-                          const checked = selectedProductIds.has(p.id);
+                          const isPaid = paidProductIds.has(p.id);
+                          const checked = selectedProductIds.has(p.id) || isPaid;
                           return (
-                            <TableRow key={p.id}>
+                            <TableRow key={p.id} className={isPaid ? "opacity-60" : undefined}>
                               {!payDialog.readonly && (
                                 <TableCell className="py-1.5">
                                   <input
                                     type="checkbox"
-                                    className="h-4 w-4 cursor-pointer"
+                                    className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
                                     checked={checked}
+                                    disabled={isPaid}
+                                    title={isPaid ? "Produk sudah terbayar" : undefined}
                                     onChange={(e) => {
+                                      if (isPaid) return;
                                       setSelectedProductIds((prev) => {
                                         const next = new Set(prev);
                                         if (e.target.checked) next.add(p.id);
@@ -930,6 +945,7 @@ export default function NotaBelanja() {
                                   />
                                 </TableCell>
                               )}
+
                               <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
                               <TableCell className="py-1.5 text-xs font-mono">
                                 {p.credit_contracts?.contract_ref || "-"}
