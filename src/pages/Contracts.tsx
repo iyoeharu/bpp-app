@@ -1552,7 +1552,8 @@ export default function Contracts() {
                     })()}
                   </div>
 
-                  {/* ===== Daftar Barang / Produk ===== */}
+                  {/* ===== Daftar Barang / Produk (disembunyikan pada Mode Lama) ===== */}
+                  {!legacyMode && (
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
