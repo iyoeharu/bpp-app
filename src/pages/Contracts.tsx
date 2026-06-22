@@ -166,6 +166,8 @@ export default function Contracts() {
   type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string; pickup_date: string };
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
+  // Mode lama: input data lama tanpa daftar produk; Modal Awal diisi manual
+  const [legacyMode, setLegacyMode] = useState(false);
 
   // Auto-sync product_type textarea with product names list
   useEffect(() => {
