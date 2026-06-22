@@ -883,6 +883,7 @@ export default function NotaBelanja() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          {!payDialog.readonly && <TableHead className="h-8 w-10">Pilih</TableHead>}
                           <TableHead className="h-8">Produk</TableHead>
                           <TableHead className="h-8">Kontrak</TableHead>
                           <TableHead className="h-8">Tgl Ambil</TableHead>
@@ -890,22 +891,48 @@ export default function NotaBelanja() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {dialogStoreProducts.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
-                            <TableCell className="py-1.5 text-xs font-mono">
-                              {p.credit_contracts?.contract_ref || "-"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-xs">
-                              {p.pickup_date ? formatDate(p.pickup_date) : <span className="italic text-muted-foreground">belum di isi</span>}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-xs text-right">
-                              {formatRupiah(Number(p.price || 0))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {dialogStoreProducts.map((p) => {
+                          const checked = selectedProductIds.has(p.id);
+                          return (
+                            <TableRow key={p.id}>
+                              {!payDialog.readonly && (
+                                <TableCell className="py-1.5">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 cursor-pointer"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      setSelectedProductIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) next.add(p.id);
+                                        else next.delete(p.id);
+                                        // auto-sum
+                                        const sum = dialogStoreProducts
+                                          .filter((dp) => next.has(dp.id))
+                                          .reduce((s, dp) => s + Number(dp.price || 0), 0);
+                                        setPayAmount(sum);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </TableCell>
+                              )}
+                              <TableCell className="py-1.5 text-xs font-medium">{p.name}</TableCell>
+                              <TableCell className="py-1.5 text-xs font-mono">
+                                {p.credit_contracts?.contract_ref || "-"}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs">
+                                {p.pickup_date ? formatDate(p.pickup_date) : <span className="italic text-muted-foreground">belum di isi</span>}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs text-right">
+                                {formatRupiah(Number(p.price || 0))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
+
                   )}
                 </div>
                 <div className="px-3 py-2 border-t grid grid-cols-3 gap-2 text-xs">
