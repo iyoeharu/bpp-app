@@ -1501,13 +1501,13 @@ export default function Contracts() {
                     <CurrencyInput
                       id="modal"
                       value={formData.modal}
-                      onValueChange={() => { /* read-only, dihitung otomatis */ }}
-                      disabled
-                      readOnly
+                      onValueChange={(val) => legacyMode && setFormData({ ...formData, modal: val || 0 })}
+                      disabled={!legacyMode}
+                      readOnly={!legacyMode}
                       placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Otomatis: Total Harga Produk + DP
+                      {legacyMode ? "Mode Lama: input manual." : "Otomatis: Total Harga Produk + DP"}
                     </p>
                   </div>
                   <div>
