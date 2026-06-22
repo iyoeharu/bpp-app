@@ -71,6 +71,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { useAdminNote } from "@/contexts/AdminNoteContext";
 
 export default function Contracts() {
@@ -165,22 +166,26 @@ export default function Contracts() {
   type ProductRow = { id?: string; name: string; price: number; status: 'hutang' | 'cash'; store: string; pickup_date: string };
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [newProduct, setNewProduct] = useState<ProductRow>({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
+  // Mode lama: input data lama tanpa daftar produk; Modal Awal diisi manual
+  const [legacyMode, setLegacyMode] = useState(false);
 
-  // Auto-sync product_type textarea with product names list
+  // Auto-sync product_type textarea with product names list (kecuali mode lama)
   useEffect(() => {
+    if (legacyMode) return;
     const joined = products.map((p) => p.name).filter(Boolean).join(', ');
     setFormData((prev) => (prev.product_type === joined ? prev : { ...prev, product_type: joined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
+  }, [products, legacyMode]);
 
-  // Auto-compute Modal Awal = total harga produk + DP (read-only)
+  // Auto-compute Modal Awal = total harga produk + DP (read-only) — kecuali mode lama
   useEffect(() => {
+    if (legacyMode) return;
     const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
     // New rule: Modal Awal = harga product - DP
     const computedModal = totalProducts - (Number(formData.dp) || 0);
     setFormData((prev) => (prev.modal === computedModal ? prev : { ...prev, modal: computedModal }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, formData.dp]);
+  }, [products, formData.dp, legacyMode]);
 
   const handleAddProduct = () => {
     const name = newProduct.name.trim();
@@ -317,6 +322,7 @@ export default function Contracts() {
         });
         setProducts([]);
         setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
+        setLegacyMode(false);
         setDialogOpen(true);
         // Remove param from URL
         searchParams.delete('newCustomerId');
@@ -344,6 +350,7 @@ export default function Contracts() {
     });
     setProducts([]);
     setNewProduct({ name: '', price: 0, status: 'cash', store: '', pickup_date: '' });
+    setLegacyMode(false);
     setDialogOpen(true);
   };
 
@@ -390,15 +397,19 @@ export default function Contracts() {
       if (error) {
         console.error('Failed to load contract products:', error);
         setProducts([]);
+        setLegacyMode(true);
       } else {
-        setProducts(((data || []) as any[]).map((p) => ({
+        const loaded = ((data || []) as any[]).map((p) => ({
           id: p.id,
           name: p.name,
           price: Number(p.price || 0),
           status: (p.status === 'hutang' ? 'hutang' : 'cash') as 'hutang' | 'cash',
           store: p.store || '',
           pickup_date: p.pickup_date || '',
-        })));
+        }));
+        setProducts(loaded);
+        // Tanpa daftar produk → asumsikan data lama
+        setLegacyMode(loaded.length === 0);
       }
     })();
     setDialogOpen(true);
@@ -500,11 +511,13 @@ export default function Contracts() {
 
     // Modal Awal otomatis = total harga produk + DP (sudah terisi otomatis, tidak perlu validasi)
 
-    // Validasi tanggal pengambilan per produk wajib diisi
-    const missingPickup = products.find((p) => !p.pickup_date);
-    if (missingPickup) {
-      toast.error(`Tanggal pengambilan wajib diisi untuk produk: ${missingPickup.name}`);
-      return;
+    // Validasi tanggal pengambilan per produk wajib diisi (skip pada mode lama)
+    if (!legacyMode) {
+      const missingPickup = products.find((p) => !p.pickup_date);
+      if (missingPickup) {
+        toast.error(`Tanggal pengambilan wajib diisi untuk produk: ${missingPickup.name}`);
+        return;
+      }
     }
     
     
@@ -539,8 +552,10 @@ export default function Contracts() {
         });
         if (!note) return;
         const prev = selectedContract;
-        // compute totalProducts from products
-        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+        // compute totalProducts from products (mode lama: pakai modal + dp manual)
+        const totalProductsForSave = legacyMode
+          ? Math.max(0, (formData.modal || 0) + (formData.dp || 0))
+          : products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const updateRes = await updateContract.mutateAsync({
           id: selectedContract.id,
           contract_ref: formData.contract_ref,
@@ -602,8 +617,10 @@ export default function Contracts() {
           }
         }
 
-        // Sync product list (replace all)
-        await syncContractProducts(selectedContract.id);
+        // Sync product list (replace all) — skip pada mode lama agar daftar produk lama tidak dihapus
+        if (!legacyMode) {
+          await syncContractProducts(selectedContract.id);
+        }
 
         // Refresh selectedContract di state lokal supaya preview/print pakai data baru
         if (updateRes?.data) {
@@ -612,7 +629,9 @@ export default function Contracts() {
         toast.success("Kontrak berhasil diperbarui");
       } else {
         // CREATE KONTRAK
-        const totalProductsForSave = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
+        const totalProductsForSave = legacyMode
+          ? Math.max(0, (formData.modal || 0) + (formData.dp || 0))
+          : products.reduce((s, p) => s + (Number(p.price) || 0), 0);
         const { data: newContract } = await createContract.mutateAsync({
           contract_ref: formData.contract_ref,
           customer_id: formData.customer_id,
@@ -641,7 +660,7 @@ export default function Contracts() {
         } else {
           toast.success("Kontrak berhasil dibuat");
         }
-        if (newContract?.id) {
+        if (newContract?.id && !legacyMode) {
           await syncContractProducts(newContract.id);
         }
       }
@@ -723,8 +742,8 @@ export default function Contracts() {
         return;
       }
 
-      // Persist product list for new contract
-      await syncContractProducts(newContract.id);
+      // Persist product list for new contract (skip mode lama)
+      if (!legacyMode) await syncContractProducts(newContract.id);
 
 
       // Generate kupon
@@ -1186,7 +1205,24 @@ export default function Contracts() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 p-6 pb-4">
-            <DialogTitle>{selectedContract ? "Edit Kontrak" : "Kontrak Kredit Baru"}</DialogTitle>
+            <div className="flex items-start justify-between gap-4">
+              <DialogTitle>{selectedContract ? "Edit Kontrak" : "Kontrak Kredit Baru"}</DialogTitle>
+              <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+                <Label htmlFor="legacy-mode-switch" className="text-xs cursor-pointer">
+                  {legacyMode ? "Mode Lama (input manual)" : "Mode Baru (dengan daftar produk)"}
+                </Label>
+                <Switch
+                  id="legacy-mode-switch"
+                  checked={legacyMode}
+                  onCheckedChange={(v) => setLegacyMode(!!v)}
+                />
+              </div>
+            </div>
+            {legacyMode && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Mode Lama: daftar produk dinonaktifkan, Modal Awal diisi manual. Gunakan untuk input data lama yang nota produknya hilang.
+              </p>
+            )}
           </DialogHeader>
           
           {/* Scrollable Content */}
@@ -1408,11 +1444,14 @@ export default function Contracts() {
                     <Textarea
                       id="product_type"
                       value={formData.product_type}
-                      readOnly
-                      placeholder="Otomatis terisi dari Daftar Barang / Produk di bawah"
-                      className="max-h-40 resize-y overflow-auto bg-muted/40"
+                      readOnly={!legacyMode}
+                      onChange={(e) => legacyMode && setFormData({ ...formData, product_type: e.target.value })}
+                      placeholder={legacyMode ? "Tulis jenis produk secara manual" : "Otomatis terisi dari Daftar Barang / Produk di bawah"}
+                      className={cn("max-h-40 resize-y overflow-auto", !legacyMode && "bg-muted/40")}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Otomatis mengikuti nama produk pada Daftar Barang / Produk.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {legacyMode ? "Mode Lama: isi manual (opsional)." : "Otomatis mengikuti nama produk pada Daftar Barang / Produk."}
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="tenor_days">
@@ -1462,13 +1501,13 @@ export default function Contracts() {
                     <CurrencyInput
                       id="modal"
                       value={formData.modal}
-                      onValueChange={() => { /* read-only, dihitung otomatis */ }}
-                      disabled
-                      readOnly
+                      onValueChange={(val) => legacyMode && setFormData({ ...formData, modal: val || 0 })}
+                      disabled={!legacyMode}
+                      readOnly={!legacyMode}
                       placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Otomatis: Total Harga Produk + DP
+                      {legacyMode ? "Mode Lama: input manual." : "Otomatis: Total Harga Produk + DP"}
                     </p>
                   </div>
                   <div>
@@ -1513,7 +1552,8 @@ export default function Contracts() {
                     })()}
                   </div>
 
-                  {/* ===== Daftar Barang / Produk ===== */}
+                  {/* ===== Daftar Barang / Produk (disembunyikan pada Mode Lama) ===== */}
+                  {!legacyMode && (
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">Daftar Barang / Produk</Label>
@@ -1693,6 +1733,7 @@ export default function Contracts() {
                     </div>
 
                   </div>
+                  )}
             </div>
           </div>
           
