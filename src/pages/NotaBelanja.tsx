@@ -167,7 +167,7 @@ export default function NotaBelanja() {
       const { data, error } = await (supabase as any)
         .from("contract_products")
         .select(
-          "id, contract_id, position, name, price, status, store, pickup_date, created_at, credit_contracts(contract_ref, start_date, customers(name))"
+          "id, contract_id, position, name, price, status, store, pickup_date, created_at, credit_contracts(contract_ref, start_date, status, customers(name))"
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
