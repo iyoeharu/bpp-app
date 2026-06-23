@@ -186,12 +186,16 @@ export default function NotaBelanja() {
     },
   });
 
-  // Filter rows & payments by period
+  // Filter rows by parent contract start_date (mirrors Dashboard period logic)
   const rows = useMemo(() => {
     return allRows.filter((r) => {
-      const d = r.created_at ? parseISO(r.created_at) : null;
-      if (!d) return false;
-      return isWithinInterval(d, periodRange);
+      const sd = r.credit_contracts?.start_date
+        ? parseISO(r.credit_contracts.start_date)
+        : r.created_at
+        ? parseISO(r.created_at)
+        : null;
+      if (!sd) return false;
+      return isWithinInterval(sd, periodRange);
     });
   }, [allRows, periodRange]);
 
