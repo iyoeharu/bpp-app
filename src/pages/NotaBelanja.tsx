@@ -90,6 +90,7 @@ interface NotaProductRow {
   credit_contracts: {
     contract_ref: string;
     start_date: string;
+    status: string | null;
     customers: { name: string } | null;
   } | null;
 }
