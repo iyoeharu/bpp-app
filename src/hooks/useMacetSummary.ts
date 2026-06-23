@@ -71,7 +71,7 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
   //    oleh determineContractStatus berdasar lateDays & gap).
   const { data: contracts, error } = await supabase
     .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)');
+    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, current_installment_index, tenor_days, daily_installment_amount, customers(name, phone), sales_agents(id, name, agent_code)');
   if (error) throw error;
 
   // 2. Kupon unpaid (total + overdue per kontrak)
