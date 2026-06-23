@@ -188,8 +188,10 @@ export default function NotaBelanja() {
   });
 
   // Filter rows by parent contract start_date (mirrors Dashboard period logic)
+  // Exclude products from contracts that have been returned (sinkron dengan Dashboard yang juga exclude status 'returned')
   const rows = useMemo(() => {
     return allRows.filter((r) => {
+      if (r.credit_contracts?.status === "returned") return false;
       const sd = r.credit_contracts?.start_date
         ? parseISO(r.credit_contracts.start_date)
         : r.created_at
