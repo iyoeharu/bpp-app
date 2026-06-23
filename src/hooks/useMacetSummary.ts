@@ -212,7 +212,7 @@ export const useMacetSummary = (month: Date = new Date()) => {
   const s = format(startOfMonth(month), 'yyyy-MM-dd');
   const e = format(endOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary_global', s, e],
+    queryKey: ['macet_summary_global_v2', s, e],
     queryFn: fetchMacetGlobal,
   });
 };
@@ -221,7 +221,7 @@ export const useMacetSummaryYearly = (year: Date = new Date()) => {
   const s = format(startOfYear(year), 'yyyy-MM-dd');
   const e = format(endOfYear(year), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary_global_yearly', s, e],
+    queryKey: ['macet_summary_global_yearly_v2', s, e],
     queryFn: fetchMacetGlobal,
   });
 };
@@ -230,7 +230,7 @@ export const useMacetSummaryRealTime = (month: Date = new Date()) => {
   const s = format(startOfMonth(month), 'yyyy-MM-dd');
   const e = format(endOfMonth(month), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: ['macet_summary_global_rt', s, e],
+    queryKey: ['macet_summary_global_rt_v2', s, e],
     queryFn: fetchMacetGlobal,
     refetchInterval: 30000,
   });
