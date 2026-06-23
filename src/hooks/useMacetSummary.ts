@@ -71,7 +71,7 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
   //    oleh determineContractStatus berdasar lateDays & gap).
   const { data: contracts, error } = await supabase
     .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)');
+    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, current_installment_index, tenor_days, daily_installment_amount, customers(name, phone), sales_agents(id, name, agent_code)');
   if (error) throw error;
 
   // 2. Kupon unpaid (total + overdue per kontrak)
@@ -150,28 +150,19 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     return status === 'macet';
   });
 
-  // Total dibayar per kontrak (utk outstanding nominal)
-  const ids = macetContracts.map((c: any) => c.id);
-  const paidMap = new Map<string, number>();
-  if (ids.length > 0) {
-    const { data: payments, error: pErr } = await supabase
-      .from('payment_logs')
-      .select('contract_id, amount_paid')
-      .in('contract_id', ids);
-    if (pErr) throw pErr;
-    (payments || []).forEach((p: any) => {
-      paidMap.set(p.contract_id, (paidMap.get(p.contract_id) || 0) + Number(p.amount_paid || 0));
-    });
-  }
-
+  // Sinkron dgn Riwayat Pelanggan: Dibayar = current_installment_index * daily_installment_amount,
+  // Sisa = (tenor_days - current_installment_index) * daily_installment_amount.
   let total_outstanding = 0;
   let total_modal_at_risk = 0;
   const detailList: MacetContractDetail[] = [];
   const salesAgg = new Map<string, MacetBySales>();
   macetContracts.forEach((c: any) => {
+    const tenor = Number(c.tenor_days || 0);
+    const idx = Number(c.current_installment_index || 0);
+    const daily = Number(c.daily_installment_amount || 0);
+    const paid = idx * daily;
+    const outstanding = Math.max(0, (tenor - idx) * daily);
     const contractTotal = Number(c.total_loan_amount || 0);
-    const paid = paidMap.get(c.id) || 0;
-    const outstanding = Math.max(0, contractTotal - paid);
     const modal = Number(c.omset || 0);
     total_outstanding += outstanding;
     total_modal_at_risk += modal;
