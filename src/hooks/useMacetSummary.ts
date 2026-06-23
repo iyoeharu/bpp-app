@@ -66,11 +66,12 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString().split('T')[0];
 
-  // 1. Semua kontrak aktif (bukan returned)
+  // 1. Semua kontrak (ACUAN: Riwayat Pelanggan / useContractStatusMap —
+  //    tidak memfilter status apa pun di level query; status final ditentukan
+  //    oleh determineContractStatus berdasar lateDays & gap).
   const { data: contracts, error } = await supabase
     .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)')
-    .neq('status', 'returned');
+    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, customers(name, phone), sales_agents(id, name, agent_code)');
   if (error) throw error;
 
   // 2. Kupon unpaid (total + overdue per kontrak)
