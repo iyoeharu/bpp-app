@@ -92,9 +92,9 @@ export default function NotaDashboard() {
           .lte("payment_date", range.end),
         (supabase as any)
           .from("contract_products")
-          .select("price, status, created_at")
-          .gte("created_at", `${range.start}T00:00:00`)
-          .lte("created_at", `${range.end}T23:59:59`),
+          .select("price, status, credit_contracts!inner(start_date)")
+          .gte("credit_contracts.start_date", range.start)
+          .lte("credit_contracts.start_date", range.end),
         (supabase as any)
           .from("credit_contracts")
           .select("dp, start_date, status")
