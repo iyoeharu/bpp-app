@@ -90,6 +90,7 @@ interface NotaProductRow {
   credit_contracts: {
     contract_ref: string;
     start_date: string;
+    status: string | null;
     customers: { name: string } | null;
   } | null;
 }
@@ -166,7 +167,7 @@ export default function NotaBelanja() {
       const { data, error } = await (supabase as any)
         .from("contract_products")
         .select(
-          "id, contract_id, position, name, price, status, store, pickup_date, created_at, credit_contracts(contract_ref, start_date, customers(name))"
+          "id, contract_id, position, name, price, status, store, pickup_date, created_at, credit_contracts(contract_ref, start_date, status, customers(name))"
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -187,8 +188,10 @@ export default function NotaBelanja() {
   });
 
   // Filter rows by parent contract start_date (mirrors Dashboard period logic)
+  // Exclude products from contracts that have been returned (sinkron dengan Dashboard yang juga exclude status 'returned')
   const rows = useMemo(() => {
     return allRows.filter((r) => {
+      if (r.credit_contracts?.status === "returned") return false;
       const sd = r.credit_contracts?.start_date
         ? parseISO(r.credit_contracts.start_date)
         : r.created_at

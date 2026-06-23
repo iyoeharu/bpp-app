@@ -92,7 +92,8 @@ export default function NotaDashboard() {
           .lte("payment_date", range.end),
         (supabase as any)
           .from("contract_products")
-          .select("price, status, credit_contracts!inner(start_date)")
+          .select("price, status, credit_contracts!inner(start_date, status)")
+          .neq("credit_contracts.status", "returned")
           .gte("credit_contracts.start_date", range.start)
           .lte("credit_contracts.start_date", range.end),
         (supabase as any)
