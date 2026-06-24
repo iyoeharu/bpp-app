@@ -22,14 +22,26 @@ export function MacetDetailDialog({ open, onOpenChange, title, data }: Props) {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Jumlah Kontrak Macet</p>
               <p className="text-lg font-bold">{data?.macet_count ?? 0}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">Modal Nyangkut</p>
-              <p className="text-lg font-bold">{formatRupiah(data?.total_modal_at_risk ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">Total Terbayar dari Kontrak Macet</p>
+              <p className="text-lg font-bold">{
+                formatRupiah(
+                  (data?.contracts || []).reduce((s, c) => s + Number(c.paid || 0), 0)
+                )
+              }</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Omset</p>
+              <p className="text-lg font-bold">{
+                formatRupiah(
+                  (data?.contracts || []).reduce((s, c) => s + Number(c.contract_total || 0), 0)
+                )
+              }</p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Sisa Tagihan</p>
@@ -46,12 +58,13 @@ export function MacetDetailDialog({ open, onOpenChange, title, data }: Props) {
                     <TableHead>Sales</TableHead>
                     <TableHead className="text-right">Kontrak</TableHead>
                     <TableHead className="text-right">Modal</TableHead>
+                    <TableHead className="text-right">Harga Jual</TableHead>
                     <TableHead className="text-right">Sisa Tagihan</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(data?.by_sales || []).length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Tidak ada data</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Tidak ada data</TableCell></TableRow>
                   ) : data!.by_sales.map((s) => (
                     <TableRow key={s.sales_id || 'none'}>
                       <TableCell>
@@ -60,6 +73,7 @@ export function MacetDetailDialog({ open, onOpenChange, title, data }: Props) {
                       </TableCell>
                       <TableCell className="text-right">{s.contract_count}</TableCell>
                       <TableCell className="text-right">{formatRupiah(s.total_modal)}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(s.total_omset)}</TableCell>
                       <TableCell className="text-right text-destructive font-semibold">{formatRupiah(s.total_outstanding)}</TableCell>
                     </TableRow>
                   ))}
@@ -79,13 +93,14 @@ export function MacetDetailDialog({ open, onOpenChange, title, data }: Props) {
                     <TableHead>Pelanggan</TableHead>
                     <TableHead>Sales</TableHead>
                     <TableHead className="text-right">Modal</TableHead>
+                    <TableHead className="text-right">Harga Jual</TableHead>
                     <TableHead className="text-right">Dibayar</TableHead>
                     <TableHead className="text-right">Sisa</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(data?.contracts || []).length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Tidak ada kontrak macet</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Tidak ada kontrak macet</TableCell></TableRow>
                   ) : data!.contracts.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="whitespace-nowrap">{format(new Date(c.start_date), 'dd MMM yyyy', { locale: idLocale })}</TableCell>
@@ -98,6 +113,7 @@ export function MacetDetailDialog({ open, onOpenChange, title, data }: Props) {
                         <Badge variant="outline">{c.sales_code ? `${c.sales_code} · ` : ''}{c.sales_name}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{formatRupiah(c.modal)}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(c.contract_total)}</TableCell>
                       <TableCell className="text-right text-green-600">{formatRupiah(c.paid)}</TableCell>
                       <TableCell className="text-right text-destructive font-semibold">{formatRupiah(c.outstanding)}</TableCell>
                     </TableRow>

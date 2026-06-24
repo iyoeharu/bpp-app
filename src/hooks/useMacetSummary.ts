@@ -45,6 +45,7 @@ export interface MacetBySales {
   contract_count: number;
   total_modal: number;
   total_outstanding: number;
+  total_omset: number;
 }
 
 const PAGE_SIZE = 1000;
@@ -188,9 +189,10 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     });
 
     const key = salesId || '__none__';
-    const cur = salesAgg.get(key) || { sales_id: salesId, sales_name: salesName, sales_code: salesCode, contract_count: 0, total_modal: 0, total_outstanding: 0 };
+  const cur = salesAgg.get(key) || { sales_id: salesId, sales_name: salesName, sales_code: salesCode, contract_count: 0, total_modal: 0, total_outstanding: 0, total_omset: 0 };
     cur.contract_count += 1;
     cur.total_modal += modal;
+  cur.total_omset += contractTotal;
     cur.total_outstanding += outstanding;
     salesAgg.set(key, cur);
   });
