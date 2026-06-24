@@ -18,6 +18,7 @@ export interface MacetSummary {
   macet_count: number;
   total_outstanding: number;
   total_modal_at_risk: number;
+  macet_customer_count?: number;
   contracts: MacetContractDetail[];
   by_sales: MacetBySales[];
 }
@@ -71,7 +72,7 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
   //    oleh determineContractStatus berdasar lateDays & gap).
   const { data: contracts, error } = await supabase
     .from('credit_contracts')
-    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, current_installment_index, tenor_days, daily_installment_amount, customers(name, phone), sales_agents(id, name, agent_code)');
+    .select('id, contract_ref, omset, total_loan_amount, start_date, status, created_at, sales_agent_id, current_installment_index, tenor_days, daily_installment_amount, customers(id, name, phone), sales_agents(id, name, agent_code)');
   if (error) throw error;
 
   // 2. Kupon unpaid (total + overdue per kontrak)
@@ -194,8 +195,16 @@ const fetchMacetGlobal = async (): Promise<MacetSummary> => {
     salesAgg.set(key, cur);
   });
 
+  // Unique customer count for macet contracts (some customers may have >1 macet contract)
+  const customerIds = new Set<string>();
+  for (const c of macetContracts) {
+    const custId = c.customers?.id || null;
+    if (custId) customerIds.add(custId);
+  }
+
   return {
     macet_count: macetContracts.length,
+    macet_customer_count: customerIds.size,
     total_outstanding,
     total_modal_at_risk,
     contracts: detailList.sort((a, b) => b.outstanding - a.outstanding),
