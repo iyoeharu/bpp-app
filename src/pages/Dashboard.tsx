@@ -24,21 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, ChevronRight, ArrowLeft, DollarSign, Target, Wallet, Percent, Calendar, Plus, Trash2, Settings, FileSpreadsheet, BarChart3, CheckCircle, CircleDollarSign, AlertTriangle, Receipt, Ban } from "lucide-react";
 import { useAdminNote } from "@/contexts/AdminNoteContext";
-        <StatCard
-          icon={Ban}
-          iconColor="text-rose-500"
-          label="Macet"
-          value={macetSummary?.total_outstanding ?? 0}
-          valueColor="text-rose-600"
-          isNegative
-          subtitle={`${macetSummary?.macet_count ?? 0} kontrak macet · ${macetSummary?.macet_customer_count ?? 0} pelanggan`}
-          hoverInfo={`Kontrak aktif berstatus MACET (acuan: Riwayat Pelanggan / useContractStatusMap).
-          Jumlah kontrak: ${macetSummary?.macet_count ?? 0}
-          Jumlah pelanggan: ${macetSummary?.macet_customer_count ?? 0}
-          Modal nyangkut: ${formatRupiah(macetSummary?.total_modal_at_risk ?? 0)}
-          Sisa tagihan macet: ${formatRupiah(macetSummary?.total_outstanding ?? 0)}`}
-          onDetailClick={() => { setMacetDetailScope('monthly'); setMacetDetailOpen(true); }}
-        />
+import { StatCard } from "@/components/dashboard/StatCard";
 import { CollectionTrendChart } from "@/components/dashboard/CollectionTrendChart";
 import { ReturnedLossDetailDialog } from "@/components/dashboard/ReturnedLossDetailDialog";
 import { OutstandingDetailDialog } from "@/components/dashboard/OutstandingDetailDialog";
@@ -49,6 +35,20 @@ import { useOutstandingDetailsMonthly, useOutstandingDetailsYearly } from "@/hoo
 import { useOmsetDetailsMonthly, useOmsetDetailsYearly } from "@/hooks/useOmsetDetails";
 import { useCollectorSalaryTotal, useCollectorSalaryTotalYearly } from "@/hooks/useCollectorSalaries";
 import { useDpTotalMonthly, useDpTotalYearly } from "@/hooks/useDpTotal";
+import { useReturnedLoss, useReturnedLossYearly } from "@/hooks/useReturnedLoss";
+import { useMacetSummaryRealTime, useMacetSummaryYearly } from "@/hooks/useMacetSummary";
+import { usePagination } from "@/hooks/usePagination";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TablePagination } from "@/components/TablePagination";
+import { format, subMonths, addMonths } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function Dashboard() {
