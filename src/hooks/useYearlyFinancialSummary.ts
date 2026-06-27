@@ -260,16 +260,12 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         });
       });
 
-      // TERTAGIH bulanan — BASIS KONTRAK:
-      // Setiap pembayaran dialokasikan ke bulan start_date kontraknya (bukan payment_date).
-      // Hanya kontrak yang start_date-nya di tahun ini yang masuk (sudah di-filter di query).
-      const contractStartMonth = new Map<string, string>();
-      (contracts || []).forEach((c: any) => {
-        if (c.start_date) contractStartMonth.set(c.id, format(new Date(c.start_date), 'yyyy-MM'));
-      });
-      (allPayments || []).forEach((p: any) => {
-        const mk = contractStartMonth.get(p.contract_id);
-        if (!mk) return;
+      // TERTAGIH bulanan — CASH BASIS:
+      // Setiap pembayaran dialokasikan ke bulan payment_date (sama dgn card Tertagih bulanan).
+      // Mengikutsertakan SEMUA pembayaran di tahun ini, tidak peduli kapan kontraknya dibuat.
+      (payments || []).forEach((p: any) => {
+        if (!p.payment_date) return;
+        const mk = format(new Date(p.payment_date), 'yyyy-MM');
         const md = monthlyData.get(mk);
         if (md) md.collected += Number(p.amount_paid || 0);
       });
