@@ -177,7 +177,7 @@ export default function Contracts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, legacyMode]);
 
-  // Auto-compute Modal Awal = total harga produk + DP (read-only) — kecuali mode lama
+  // Auto-compute Modal Awal = total harga produk - DP (read-only) — kecuali mode lama
   useEffect(() => {
     if (legacyMode) return;
     const totalProducts = products.reduce((s, p) => s + (Number(p.price) || 0), 0);
@@ -509,7 +509,7 @@ export default function Contracts() {
       return;
     }
 
-    // Modal Awal otomatis = total harga produk + DP (sudah terisi otomatis, tidak perlu validasi)
+    // Modal Awal otomatis = total harga produk - DP (sudah terisi otomatis, tidak perlu validasi)
 
     // Validasi tanggal pengambilan per produk wajib diisi (skip pada mode lama)
     if (!legacyMode) {
@@ -1507,7 +1507,7 @@ export default function Contracts() {
                       placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {legacyMode ? "Mode Lama: input manual." : "Otomatis: Total Harga Produk + DP"}
+                      {legacyMode ? "Mode Lama: input manual." : "Otomatis: Total Harga Produk - DP"}
                     </p>
                   </div>
                   <div>
@@ -1773,6 +1773,7 @@ export default function Contracts() {
                   const progress = (selectedContract.current_installment_index / selectedContract.tenor_days) * 100;
                   const paidAmount = selectedContract.current_installment_index * selectedContract.daily_installment_amount;
                   const remainingAmount = (selectedContract.tenor_days - selectedContract.current_installment_index) * selectedContract.daily_installment_amount;
+                  const modalAwal = Math.max(0, (selectedContract.omset || 0) - ((selectedContract as any).dp || 0));
                   const createdAt = new Date(selectedContract.created_at);
                   const today = new Date();
                   const daysElapsed = Math.max(1, Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1828,7 +1829,7 @@ export default function Contracts() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Modal</p>
-                          <p className="font-semibold text-lg">{formatRupiah((selectedContract.omset || 0) + ((selectedContract as any).dp || 0))}</p>
+                          <p className="font-semibold text-lg">{formatRupiah(modalAwal)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">DP (Down Payment)</p>
@@ -1836,7 +1837,7 @@ export default function Contracts() {
                         </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Keuntungan</p>
-                            <p className="font-semibold text-lg">{formatRupiah((selectedContract.total_loan_amount || 0) - ((selectedContract.omset || 0) + ((selectedContract as any).dp || 0)))}</p>
+                              <p className="font-semibold text-lg">{formatRupiah((selectedContract.total_loan_amount || 0) - modalAwal)}</p>
                           </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Cicilan Harian</p>

@@ -355,13 +355,14 @@ export const exportPaymentPerCollectorDaily = async (
     const startRow = hRow.number + 1;
 
     c.details.forEach((d, idx) => {
-      // No Kupon: range dari serah terima (handover) — tunjukkan startIndex-endIndex
-      // (menampilkan kupon yang diserahterimakan, terbayar atau belum). Jika tidak ada kupon, tampilkan '0'.
-      const range = (d.couponCount || 0) === 0
+      // No Kupon: show the range of handover indexes THAT ARE ALREADY PAID (paidStartIndex-paidEndIndex).
+      // If nothing has been paid yet, show '0'. This aligns the export with the user's request.
+      const hasPaid = (d.paidCount || 0) > 0 && typeof d.paidStartIndex === 'number' && typeof d.paidEndIndex === 'number';
+      const range = !hasPaid
         ? '0'
-        : d.startIndex === d.endIndex
-          ? `${d.startIndex}`
-          : `${d.startIndex}-${d.endIndex}`;
+        : d.paidStartIndex === d.paidEndIndex
+          ? `${d.paidStartIndex}`
+          : `${d.paidStartIndex}-${d.paidEndIndex}`;
       // kupon sisa (belum dibayar) = total kupon handover - paidCount
       const kuponSisa = Math.max(0, (d.couponCount || 0) - (d.paidCount || 0));
       const row = sheet.addRow([

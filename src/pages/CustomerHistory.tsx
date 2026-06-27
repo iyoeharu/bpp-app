@@ -26,11 +26,11 @@ import { usePaymentsByContract } from "@/hooks/usePayments";
 import { useHandoversByContract } from "@/hooks/useCouponHandovers";
 import { useCouponsByContract } from "@/hooks/useInstallmentCoupons";
 import { useContractStatusMap } from "@/hooks/useContractStatusMap";
+import { useHolidays } from "@/hooks/useHolidays";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { differenceInDays } from "date-fns";
 import { 
   calculateDaysSinceLastPayment, 
   determineContractStatus,
@@ -45,10 +45,49 @@ export default function CustomerHistory() {
   const { data: customers } = useCustomers();
   const { data: contracts } = useContracts();
   const { data: statusMap } = useContractStatusMap();
+  const { data: holidays } = useHolidays();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedContractId, setSelectedContractId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<ContractStatusFilter>('all');
+
+  const holidayData = useMemo(() => {
+    const holidayDates = new Set<string>();
+    const recurringWeekdays = new Set<number>([0]); // Minggu default libur
+
+    for (const holiday of holidays ?? []) {
+      if (holiday.holiday_type === 'specific_date' && holiday.holiday_date) {
+        holidayDates.add(holiday.holiday_date);
+      } else if (holiday.holiday_type === 'recurring_weekday' && holiday.day_of_week != null) {
+        recurringWeekdays.add(holiday.day_of_week);
+      }
+    }
+
+    return { holidayDates, recurringWeekdays };
+  }, [holidays]);
+
+  const countWorkingDays = (fromIso: string, toDate: Date) => {
+    const from = new Date(fromIso);
+    from.setHours(0, 0, 0, 0);
+    const end = new Date(toDate);
+    end.setHours(0, 0, 0, 0);
+
+    const isWorkingDay = (date: Date) => {
+      if (holidayData.recurringWeekdays.has(date.getDay())) return false;
+      const iso = date.toISOString().split('T')[0];
+      if (holidayData.holidayDates.has(iso)) return false;
+      return true;
+    };
+
+    let count = 0;
+    const cur = new Date(from);
+    cur.setDate(cur.getDate() + 1); // exclusive dari fromIso
+    while (cur.getTime() <= end.getTime()) {
+      if (isWorkingDay(cur)) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  };
 
   // Helper: ambil status real-time dari statusMap (sumber kebenaran).
   // Saat map belum siap, gunakan heuristik berbasis createdAt agar tidak
@@ -126,6 +165,8 @@ export default function CustomerHistory() {
     notes: string | null;
     start_index: number;
     end_index: number;
+    paid_start_index: number;
+    paid_end_index: number;
     kb: number;      // kupon bawa (diserahkan)
     kp: number;      // kupon pulang (tidak terbayar)
     paid_count: number;
@@ -145,16 +186,20 @@ export default function CustomerHistory() {
     for (const h of handovers || []) {
       let paid = 0;
       let total = 0;
+      const paidIndexes: number[] = [];
       for (let i = h.start_index; i <= h.end_index; i++) {
         const pay = paymentsByIdx.get(i);
         if (pay) {
           paid += 1;
           total += pay.amount;
+          paidIndexes.push(i);
           paidIndicesInHandover.add(i);
         }
       }
       const kb = h.coupon_count;
       const kp = Math.max(0, kb - paid);
+      const paidStartIndex = paidIndexes[0] ?? 0;
+      const paidEndIndex = paidIndexes[paidIndexes.length - 1] ?? 0;
       rows.push({
         id: h.id,
         payment_date: h.handover_date,
@@ -162,6 +207,8 @@ export default function CustomerHistory() {
         notes: h.notes,
         start_index: h.start_index,
         end_index: h.end_index,
+        paid_start_index: paidStartIndex,
+        paid_end_index: paidEndIndex,
         kb,
         kp,
         paid_count: paid,
@@ -213,6 +260,8 @@ export default function CustomerHistory() {
           notes: g.notes,
           start_index: g.start_index,
           end_index: g.end_index,
+          paid_start_index: g.start_index,
+          paid_end_index: g.end_index,
           kb: g.count,
           kp: 0,
           paid_count: g.count,
@@ -267,10 +316,10 @@ export default function CustomerHistory() {
   const overdueCount = overdueCoupons.length;
   const oldestOverdue = overdueCoupons[0]?.due_date;
   const daysLate = oldestOverdue
-    ? differenceInDays(today, new Date(oldestOverdue))
+    ? countWorkingDays(oldestOverdue, today)
     : 0;
   const lateNote = overdueCount > 0
-    ? `Terlambat ${overdueCount} kupon`
+    ? `Terlambat ${overdueCount} kupon dengan ${daysLate} hari keterlambatan`
     : selectedContract?.status === 'completed'
       ? 'Kontrak telah lunas'
       : 'Tidak ada keterlambatan';
@@ -579,9 +628,10 @@ export default function CustomerHistory() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Kupon</TableHead>
+                      <TableHead>No Kupon</TableHead>
                       <TableHead>Tanggal</TableHead>
                       <TableHead className="text-center" title="Kupon Bawa (diserahkan ke kolektor)">KB</TableHead>
+                      <TableHead className="text-center" title="Kupon yang sudah terbayar">Kupon Dibayar</TableHead>
                       <TableHead className="text-center" title="Kupon Pulang (tidak terbayar)">KP</TableHead>
                       <TableHead className="text-right">Jumlah</TableHead>
                       <TableHead>Kolektor</TableHead>
@@ -591,11 +641,11 @@ export default function CustomerHistory() {
                   <TableBody>
                     {(loadingPayments || loadingHandovers) ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center">Memuat...</TableCell>
+                        <TableCell colSpan={8} className="text-center">Memuat...</TableCell>
                       </TableRow>
                     ) : paginatedPayments?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
                           Belum ada serah terima / pembayaran
                         </TableCell>
                       </TableRow>
@@ -604,13 +654,16 @@ export default function CustomerHistory() {
                         <TableRow key={payment.id}>
                           <TableCell>
                             <Badge variant="outline">
-                              {payment.start_index === payment.end_index
-                                ? payment.start_index
-                                : `${payment.start_index} - ${payment.end_index}`}
+                              {payment.paid_count > 0
+                                ? payment.paid_start_index === payment.paid_end_index
+                                  ? payment.paid_start_index
+                                  : `${payment.paid_start_index} - ${payment.paid_end_index}`
+                                : '0'}
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(payment.payment_date)}</TableCell>
                           <TableCell className="text-center font-medium">{payment.kb}</TableCell>
+                          <TableCell className="text-center font-medium">{payment.paid_count}</TableCell>
                           <TableCell className={`text-center font-medium ${payment.kp > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                             {payment.kp}
                           </TableCell>
