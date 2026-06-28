@@ -268,8 +268,8 @@ export default function NotaDashboard() {
             {isLoading ? "..." : formatRupiah(d?.sisaDuit || 0)}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Total Tertagih − Biaya Operasional − Gaji Karyawan − Gaji Kolektor − Bayar Hutang − Bayar
-            Cash − Komisi Sales + Total DP
+            Total Tertagih (by tanggal pembayaran) − Biaya Operasional − Gaji Karyawan − Gaji Kolektor
+            − Bayar Hutang − Bayar Cash − Komisi Sales − Total DP
           </p>
         </CardContent>
       </Card>
