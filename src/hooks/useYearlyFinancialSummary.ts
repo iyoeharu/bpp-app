@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfYear, endOfYear, format, eachMonthOfInterval, differenceInDays } from 'date-fns';
+import { startOfYear, endOfYear, format, eachMonthOfInterval } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { CommissionTier, calculateTieredCommission } from './useCommissionTiers';
 import { determineContractStatus, calculateLateDays, calculateDaysSinceLastPayment, ContractStatus } from '@/lib/statusCalculation';
@@ -77,6 +77,27 @@ export interface YearlyFinancialSummary {
   monthly_details: MonthlyDetailData[];
 }
 
+const PAGE_SIZE = 1000;
+
+async function fetchAll<T>(builder: () => any): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = (data || []) as T[];
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
 /**
  * Ringkasan keuangan tahunan — CONTRACT BASIS (accrual).
  * Modal/Omset/Profit bulanan & tahunan dihitung dari NILAI PENUH kontrak,
@@ -110,53 +131,60 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
     queryFn: async (): Promise<YearlyFinancialSummary> => {
       const [
         { data: agents, error: agentsError },
-        { data: contracts, error: contractsError },
-        { data: expenses, error: expensesError },
+        contracts,
+        expenses,
         { data: tiersData, error: tiersError },
-        { data: allCoupons, error: allCouponsError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
-        supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)').neq('status', 'returned').gte('start_date', yearStart).lte('start_date', yearEnd),
-        supabase.from('operational_expenses').select('amount, expense_date, description, category').gte('expense_date', yearStart).lte('expense_date', yearEnd),
+        fetchAll<any>(() => supabase
+          .from('credit_contracts')
+          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)')
+          .neq('status', 'returned')
+          .gte('start_date', yearStart)
+          .lte('start_date', yearEnd)
+          .order('start_date', { ascending: true })
+        ),
+        fetchAll<any>(() => supabase
+          .from('operational_expenses')
+          .select('amount, expense_date, description, category')
+          .gte('expense_date', yearStart)
+          .lte('expense_date', yearEnd)
+          .order('expense_date', { ascending: true })
+        ),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
-        supabase.from('installment_coupons').select('contract_id, due_date, status, installment_index, amount'),
       ]);
 
       if (agentsError) throw agentsError;
-      if (contractsError) throw contractsError;
-      if (expensesError) throw expensesError;
       if (tiersError) throw tiersError;
-      if (allCouponsError) throw allCouponsError;
+
+      const yearContractIds = (contracts || []).map((c: any) => c.id);
+      const allCoupons = yearContractIds.length > 0
+        ? await fetchAll<any>(() => supabase
+          .from('installment_coupons')
+          .select('contract_id, due_date, status, installment_index, amount')
+          .in('contract_id', yearContractIds)
+          .order('contract_id', { ascending: true })
+        )
+        : [];
 
       // TERTAGIH yearly: ambil payment_logs HANYA untuk kontrak tahun ini,
-      // dipaginate supaya tidak kena default limit 1000 baris Supabase
-      // (penyebab card Tertagih tahunan sebelumnya lebih kecil dari sum bulanan).
-      const yearContractIds = (contracts || []).map((c: any) => c.id);
+      // dan semua sumber data utama dipaginate supaya tidak kena default limit 1000 baris Supabase.
       const allPayments: { amount_paid: number; contract_id: string }[] = [];
       const allPaymentLogs: { contract_id: string; payment_date: string }[] = [];
       if (yearContractIds.length > 0) {
         const CHUNK = 200;
-        const PAGE = 1000;
         for (let i = 0; i < yearContractIds.length; i += CHUNK) {
           const ids = yearContractIds.slice(i, i + CHUNK);
-          let from = 0;
-          // eslint-disable-next-line no-constant-condition
-          while (true) {
-            const { data, error } = await supabase
+          const rows = await fetchAll<any>(() => supabase
               .from('payment_logs')
               .select('amount_paid, contract_id, payment_date')
               .in('contract_id', ids)
               .order('payment_date', { ascending: false })
-              .range(from, from + PAGE - 1);
-            if (error) throw error;
-            const rows = data || [];
-            rows.forEach((r: any) => {
-              allPayments.push({ amount_paid: Number(r.amount_paid || 0), contract_id: r.contract_id });
-              allPaymentLogs.push({ contract_id: r.contract_id, payment_date: r.payment_date });
-            });
-            if (rows.length < PAGE) break;
-            from += PAGE;
-          }
+            );
+          rows.forEach((r: any) => {
+            allPayments.push({ amount_paid: Number(r.amount_paid || 0), contract_id: r.contract_id });
+            allPaymentLogs.push({ contract_id: r.contract_id, payment_date: r.payment_date });
+          });
         }
       }
 
