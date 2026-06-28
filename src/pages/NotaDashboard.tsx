@@ -65,11 +65,35 @@ export default function NotaDashboard() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["nota_dashboard_contract_basis_v2", range.start, range.end],
+    queryKey: ["nota_dashboard_payment_basis_v3", range.start, range.end],
     queryFn: async () => {
-      // CONTRACT BASIS (selaras dengan Tertagih di Dashboard):
-      // Total Tertagih dialokasikan ke periode berdasarkan start_date kontrak,
-      // bukan payment_date. Contoh: kontrak Mei dibayar Juni → tetap masuk Mei.
+      // PAYMENT-DATE BASIS (selaras dengan halaman Penagihan):
+      // Total Tertagih dihitung dari payment_logs.payment_date di dalam periode.
+      // Paginate untuk hindari limit 1000 baris.
+      const PAGE = 1000;
+      let totalTertagih = 0;
+      let from = 0;
+      const seen = new Set<string>();
+      for (;;) {
+        const { data: rows, error } = await (supabase as any)
+          .from("payment_logs")
+          .select("id, amount_paid, payment_date")
+          .gte("payment_date", range.start)
+          .lte("payment_date", range.end)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = rows || [];
+        for (const r of batch) {
+          if (seen.has(r.id)) continue;
+          seen.add(r.id);
+          totalTertagih += Number(r.amount_paid || 0);
+        }
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
+
+      // Kontrak periode (untuk Total DP & basis nota belanja/cash) tetap by start_date
       const periodContractsRes = await (supabase as any)
         .from("credit_contracts")
         .select("id, dp, start_date, status")
@@ -78,21 +102,6 @@ export default function NotaDashboard() {
         .lte("start_date", range.end);
       if (periodContractsRes.error) throw periodContractsRes.error;
       const periodContracts = periodContractsRes.data || [];
-      const periodContractIds = periodContracts.map((c: any) => c.id);
-
-      let totalTertagih = 0;
-      if (periodContractIds.length > 0) {
-        const CHUNK = 200;
-        for (let i = 0; i < periodContractIds.length; i += CHUNK) {
-          const ids = periodContractIds.slice(i, i + CHUNK);
-          const { data: rows, error } = await (supabase as any)
-            .from("payment_logs")
-            .select("amount_paid")
-            .in("contract_id", ids);
-          if (error) throw error;
-          for (const r of rows || []) totalTertagih += Number(r.amount_paid || 0);
-        }
-      }
 
       const [expensesRes, notaPayRes, productsRes, commissionsRes] = await Promise.all([
         (supabase as any)
