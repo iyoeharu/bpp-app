@@ -119,6 +119,8 @@ export const useCreatePayment = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
       queryClient.invalidateQueries({ queryKey: ['collection_trend'] });
@@ -221,6 +223,8 @@ export const useCreateBulkPayment = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
       queryClient.invalidateQueries({ queryKey: ['collection_trend'] });

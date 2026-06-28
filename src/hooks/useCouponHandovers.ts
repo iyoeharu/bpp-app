@@ -136,6 +136,8 @@ export const useCreateCouponHandover = () => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['installment_coupons'] });
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
       queryClient.invalidateQueries({ queryKey: ['aggregated_payments'] });
       queryClient.invalidateQueries({ queryKey: ['collection_trend'] });
     },
