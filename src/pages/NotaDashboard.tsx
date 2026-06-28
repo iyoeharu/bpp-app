@@ -65,21 +65,36 @@ export default function NotaDashboard() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["nota_dashboard", range.start, range.end],
+    queryKey: ["nota_dashboard_contract_basis_v2", range.start, range.end],
     queryFn: async () => {
-      const [
-        paymentsRes,
-        expensesRes,
-        notaPayRes,
-        productsRes,
-        contractsRes,
-        commissionsRes,
-      ] = await Promise.all([
-        (supabase as any)
-          .from("payment_logs")
-          .select("amount_paid, payment_date")
-          .gte("payment_date", range.start)
-          .lte("payment_date", range.end),
+      // CONTRACT BASIS (selaras dengan Tertagih di Dashboard):
+      // Total Tertagih dialokasikan ke periode berdasarkan start_date kontrak,
+      // bukan payment_date. Contoh: kontrak Mei dibayar Juni → tetap masuk Mei.
+      const periodContractsRes = await (supabase as any)
+        .from("credit_contracts")
+        .select("id, dp, start_date, status")
+        .neq("status", "returned")
+        .gte("start_date", range.start)
+        .lte("start_date", range.end);
+      if (periodContractsRes.error) throw periodContractsRes.error;
+      const periodContracts = periodContractsRes.data || [];
+      const periodContractIds = periodContracts.map((c: any) => c.id);
+
+      let totalTertagih = 0;
+      if (periodContractIds.length > 0) {
+        const CHUNK = 200;
+        for (let i = 0; i < periodContractIds.length; i += CHUNK) {
+          const ids = periodContractIds.slice(i, i + CHUNK);
+          const { data: rows, error } = await (supabase as any)
+            .from("payment_logs")
+            .select("amount_paid")
+            .in("contract_id", ids);
+          if (error) throw error;
+          for (const r of rows || []) totalTertagih += Number(r.amount_paid || 0);
+        }
+      }
+
+      const [expensesRes, notaPayRes, productsRes, commissionsRes] = await Promise.all([
         (supabase as any)
           .from("operational_expenses")
           .select("amount, category, expense_date")
@@ -97,12 +112,6 @@ export default function NotaDashboard() {
           .gte("credit_contracts.start_date", range.start)
           .lte("credit_contracts.start_date", range.end),
         (supabase as any)
-          .from("credit_contracts")
-          .select("dp, start_date, status")
-          .neq("status", "returned")
-          .gte("start_date", range.start)
-          .lte("start_date", range.end),
-        (supabase as any)
           .from("commission_payments")
           .select("amount, payment_date")
           .gte("payment_date", range.start)
@@ -110,18 +119,11 @@ export default function NotaDashboard() {
       ]);
 
       const err =
-        paymentsRes.error ||
         expensesRes.error ||
         notaPayRes.error ||
         productsRes.error ||
-        contractsRes.error ||
         commissionsRes.error;
       if (err) throw err;
-
-      const totalTertagih = (paymentsRes.data || []).reduce(
-        (s: number, p: any) => s + Number(p.amount_paid || 0),
-        0
-      );
 
       let gajiKaryawan = 0;
       let gajiKolektor = 0;
@@ -146,7 +148,7 @@ export default function NotaDashboard() {
         else totalInvoice += amt;
       }
 
-      const totalDp = (contractsRes.data || []).reduce(
+      const totalDp = periodContracts.reduce(
         (s: number, c: any) => s + Number(c.dp || 0),
         0
       );
