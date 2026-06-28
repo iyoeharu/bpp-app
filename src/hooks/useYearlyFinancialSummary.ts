@@ -127,7 +127,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
   const yearEnd = format(endOfYear(year), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['yearly_financial_summary_contract_v3', yearStart, yearEnd, statusFilter],
+    queryKey: ['yearly_financial_summary_contract_v4', yearStart, yearEnd, statusFilter],
     queryFn: async (): Promise<YearlyFinancialSummary> => {
       const [
         { data: agents, error: agentsError },

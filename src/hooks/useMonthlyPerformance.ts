@@ -75,7 +75,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['monthly_performance_contract_v3', monthStart, monthEnd],
+    queryKey: ['monthly_performance_contract_v4', monthStart, monthEnd],
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
       const [
         { data: agents, error: agentsError },
