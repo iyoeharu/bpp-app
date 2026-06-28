@@ -143,13 +143,15 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
           .gte('start_date', yearStart)
           .lte('start_date', yearEnd)
           .order('start_date', { ascending: true })
+          .order('id', { ascending: true })
         ),
         fetchAll<any>(() => supabase
           .from('operational_expenses')
-          .select('amount, expense_date, description, category')
+          .select('amount, expense_date, description, category, id')
           .gte('expense_date', yearStart)
           .lte('expense_date', yearEnd)
           .order('expense_date', { ascending: true })
+          .order('id', { ascending: true })
         ),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
@@ -161,27 +163,33 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const allCoupons = yearContractIds.length > 0
         ? await fetchAll<any>(() => supabase
           .from('installment_coupons')
-          .select('contract_id, due_date, status, installment_index, amount')
+          .select('contract_id, due_date, status, installment_index, amount, id')
           .in('contract_id', yearContractIds)
           .order('contract_id', { ascending: true })
+          .order('id', { ascending: true })
         )
         : [];
 
       // TERTAGIH yearly: ambil payment_logs HANYA untuk kontrak tahun ini,
       // dan semua sumber data utama dipaginate supaya tidak kena default limit 1000 baris Supabase.
+      // Order WAJIB pakai tiebreaker `id` — kalau hanya `payment_date`, baris dengan tanggal sama
+      // bisa muncul ganda saat pagination → Tertagih tahunan membengkak.
       const allPayments: { amount_paid: number; contract_id: string }[] = [];
       const allPaymentLogs: { contract_id: string; payment_date: string }[] = [];
+      const seenPaymentIds = new Set<string>();
       if (yearContractIds.length > 0) {
         const CHUNK = 200;
         for (let i = 0; i < yearContractIds.length; i += CHUNK) {
           const ids = yearContractIds.slice(i, i + CHUNK);
           const rows = await fetchAll<any>(() => supabase
               .from('payment_logs')
-              .select('amount_paid, contract_id, payment_date')
+              .select('id, amount_paid, contract_id, payment_date')
               .in('contract_id', ids)
-              .order('payment_date', { ascending: false })
+              .order('id', { ascending: true })
             );
           rows.forEach((r: any) => {
+            if (r.id && seenPaymentIds.has(r.id)) return; // guard ekstra anti-dedup
+            if (r.id) seenPaymentIds.add(r.id);
             allPayments.push({ amount_paid: Number(r.amount_paid || 0), contract_id: r.contract_id });
             allPaymentLogs.push({ contract_id: r.contract_id, payment_date: r.payment_date });
           });
