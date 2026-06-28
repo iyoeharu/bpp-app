@@ -3,6 +3,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { calculateTieredCommission, CommissionTier } from './useCommissionTiers';
 import { startOfMonth, endOfMonth, format, startOfYear, endOfYear } from 'date-fns';
 
+const PAGE_SIZE = 1000;
+const IN_CHUNK_SIZE = 200;
+
+async function fetchAll<T>(builder: () => any): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = (data || []) as T[];
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
 export interface MonthlyPerformanceData {
   agent_id: string;
   agent_name: string;
@@ -53,25 +75,27 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['monthly_performance_contract_v2', monthStart, monthEnd],
+    queryKey: ['monthly_performance_contract_v3', monthStart, monthEnd],
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
       const [
         { data: agents, error: agentsError },
-        { data: contracts, error: contractsError },
+        contracts,
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
-        supabase
+        fetchAll<any>(() => supabase
           .from('credit_contracts')
           .select('id, omset, total_loan_amount, sales_agent_id, start_date, status, tenor_days, daily_installment_amount')
           .neq('status', 'returned')
           .gte('start_date', monthStart)
-          .lte('start_date', monthEnd),
+          .lte('start_date', monthEnd)
+          .order('start_date', { ascending: true })
+          .order('id', { ascending: true })
+        ),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
       if (agentsError) throw agentsError;
-      if (contractsError) throw contractsError;
       if (tiersError) throw tiersError;
 
       const tiers: CommissionTier[] = (tiersData || []) as CommissionTier[];
@@ -103,19 +127,24 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
       const collectedByAgent = new Map<string, number>();
       let totalCollectedThisMonth = 0;
       if (contractIdsThisMonth.length > 0) {
-        const { data: allPayments, error: paymentsError } = await supabase
-          .from('payment_logs')
-          .select('amount_paid, contract_id')
-          .in('contract_id', contractIdsThisMonth);
-        if (paymentsError) throw paymentsError;
-        (allPayments || []).forEach((p: any) => {
-          const amt = Number(p.amount_paid || 0);
-          totalCollectedThisMonth += amt;
-          const agentId = contractAgentMap.get(p.contract_id);
-          if (agentId) {
-            collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + amt);
-          }
-        });
+        for (let i = 0; i < contractIdsThisMonth.length; i += IN_CHUNK_SIZE) {
+          const ids = contractIdsThisMonth.slice(i, i + IN_CHUNK_SIZE);
+          const allPayments = await fetchAll<any>(() => supabase
+            .from('payment_logs')
+            .select('amount_paid, contract_id, id')
+            .in('contract_id', ids)
+            .order('id', { ascending: true })
+          );
+
+          allPayments.forEach((p: any) => {
+            const amt = Number(p.amount_paid || 0);
+            totalCollectedThisMonth += amt;
+            const agentId = contractAgentMap.get(p.contract_id);
+            if (agentId) {
+              collectedByAgent.set(agentId, (collectedByAgent.get(agentId) || 0) + amt);
+            }
+          });
+        }
       }
 
       const agentResults: MonthlyPerformanceData[] = (agents || []).map((agent) => {
