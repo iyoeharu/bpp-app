@@ -76,6 +76,8 @@ export const useCreateContract = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
 
       const d = result.data as Record<string, unknown> & {
         customers?: { name?: string; phone?: string } | null;
@@ -131,6 +133,8 @@ export const useUpdateContract = () => {
     onSuccess: ({ data, before, _note }) => {
       queryClient.invalidateQueries({ queryKey: ['credit_contracts'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
 
       const d = data as Record<string, unknown> & {
         customers?: { name?: string; phone?: string } | null;
@@ -211,6 +215,8 @@ export const useDeleteContract = () => {
       queryClient.invalidateQueries({ queryKey: ['invoice_details'] });
       queryClient.invalidateQueries({ queryKey: ['installment_coupons'] });
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
       queryClient.invalidateQueries({ queryKey: ['coupon_handovers'] });
       queryClient.invalidateQueries({ queryKey: ['outstanding_coupons'] });
 
