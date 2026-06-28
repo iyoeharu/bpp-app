@@ -772,7 +772,7 @@ export default function Dashboard() {
                   value={yearlyFinancial?.total_collected ?? 0}
                   valueColor="text-teal-600"
                   subtitle="Gabungan Tertagih per bulan"
-                  hoverInfo={`Total Tertagih tahun ${selectedYear.getFullYear()} = jumlah dari Tertagih setiap bulan.\nRumus: SUM(payment_logs.amount_paid WHERE payment_date di tahun ini), dialokasikan per bulan.\nIdentik dengan jumlah 12 card Tertagih bulanan di dashboard.\nTotal: ${formatRupiah(yearlyFinancial?.total_collected ?? 0)}`}
+                  hoverInfo={`Total Tertagih tahun ${selectedYear.getFullYear()} = jumlah dari Tertagih setiap bulan.\nRumus: SUM(Tertagih bulanan) dari 12 bulan dalam tahun ini.\nBukan cash flow based, tapi akumulasi nilai tertagih per bulan kontrak.\nTotal: ${formatRupiah(yearlyFinancial?.total_collected ?? 0)}`}
                 />
 
                 <StatCard

@@ -88,9 +88,10 @@ export interface YearlyFinancialSummary {
  *   cicilan yang BELUM dibayar (status = 'unpaid').
  * - Konsisten dengan Sisa Tagihan bulanan (yaitu sum dari semua bulan dlm tahun ini).
  * 
- * TERTAGIH (total_collected) — SUM DARI TERTAGIH BULANAN:
- * - Setiap bulan dihitung dari SUM(payment_logs.amount_paid) yang payment_date-nya
- *   di bulan tersebut (cash basis, sama dengan card Tertagih di dashboard bulanan).
+ * TERTAGIH (total_collected) — CONTRACT BASIS (CONSISTENT DENGAN MONTHLY):
+ * - Setiap bulan dihitung dari SUM(payment_logs.amount_paid) untuk kontrak yang
+ *   start_date-nya di bulan tersebut (bukan berdasarkan payment_date).
+ * - Contoh: Kontrak dibuat Jan, bayar Feb → Tercatat di Jan (konsisten monthly).
  * - Total tahunan = gabungan (sum) dari Tertagih setiap bulan dalam tahun ini.
  * - Dengan demikian yearly `total_collected` identik dengan jumlah 12 card bulanan.
  * 
@@ -110,7 +111,6 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const [
         { data: agents, error: agentsError },
         { data: contracts, error: contractsError },
-        { data: payments, error: paymentsError },
         { data: allPayments, error: allPaymentsError },
         { data: expenses, error: expensesError },
         { data: tiersData, error: tiersError },
@@ -119,7 +119,9 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
         supabase.from('credit_contracts').select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)').neq('status', 'returned').gte('start_date', yearStart).lte('start_date', yearEnd),
-        supabase.from('payment_logs').select('amount_paid, payment_date, contract_id').gte('payment_date', yearStart).lte('payment_date', yearEnd),
+        // TERTAGIH yearly mengikuti contract basis seperti monthly:
+        // ambil semua pembayaran untuk kontrak yang start_date-nya di tahun ini,
+        // tanpa memfilter payment_date supaya pembayaran lintas tahun tetap masuk ke tahun kontraknya.
         supabase.from('payment_logs').select('amount_paid, contract_id'),
         supabase.from('operational_expenses').select('amount, expense_date, description, category').gte('expense_date', yearStart).lte('expense_date', yearEnd),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
@@ -129,7 +131,6 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
 
       if (agentsError) throw agentsError;
       if (contractsError) throw contractsError;
-      if (paymentsError) throw paymentsError;
       if (allPaymentsError) throw allPaymentsError;
       if (expensesError) throw expensesError;
       if (tiersError) throw tiersError;
@@ -186,6 +187,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const monthlyContractDetails: Map<string, Map<string, MonthlyContractDetail>> = new Map();
       const monthlyExpenseDetails: Map<string, { description: string; amount: number; category: string | null }[]> = new Map();
       const monthlyAgentOmset: Map<string, Map<string, number>> = new Map(); // monthKey -> agentId -> omset full
+      const contractStartMonthById = new Map<string, string>();
 
       months.forEach(monthDate => {
         const monthKey = format(monthDate, 'yyyy-MM');
@@ -200,7 +202,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         monthlyAgentOmset.set(monthKey, new Map());
       });
 
-      // Totals (CONTRACT BASIS untuk modal/omset/profit, CASH untuk collected)
+      // Totals (CONTRACT BASIS untuk modal/omset/profit, dan juga CONTRACT BASIS untuk collected)
       let totalModal = 0;
       let totalOmset = 0;
       let totalExpenses = 0;
@@ -208,7 +210,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
       const agentYearlyOmset = new Map<string, number>();
       const agentYearlyModal = new Map<string, number>();
       const agentYearlyContracts = new Map<string, Set<string>>();
-
+      
       // Process kontrak: alokasikan FULL ke bulan start_date
       // Note: Kontrak sudah di-filter di database berdasarkan start_date dan status
       (contracts || []).forEach((contract: any) => {
@@ -221,6 +223,7 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         const monthKey = format(startDate, 'yyyy-MM');
         const md = monthlyData.get(monthKey);
         if (!md) return;
+        contractStartMonthById.set(contract.id, monthKey);
 
         const omsetFull = Number(contract.total_loan_amount || 0);
         const modalFull = Number(contract.omset || 0);
@@ -260,12 +263,13 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         });
       });
 
-      // TERTAGIH bulanan — CASH BASIS:
-      // Setiap pembayaran dialokasikan ke bulan payment_date (sama dgn card Tertagih bulanan).
-      // Mengikutsertakan SEMUA pembayaran di tahun ini, tidak peduli kapan kontraknya dibuat.
-      (payments || []).forEach((p: any) => {
-        if (!p.payment_date) return;
-        const mk = format(new Date(p.payment_date), 'yyyy-MM');
+      // TERTAGIH bulanan — CONTRACT BASIS (CONSISTENT DENGAN MONTHLY):
+      // Setiap pembayaran dialokasikan ke bulan start_date kontrak (bukan payment_date).
+      // Hanya pembayaran untuk kontrak tahun ini yang diikutsertakan.
+      // Rumus: SUM(payment_logs.amount_paid) untuk kontrak yang start_date-nya bulan itu.
+      (allPayments || []).forEach((p: any) => {
+        const mk = contractStartMonthById.get(p.contract_id);
+        if (!mk) return;
         const md = monthlyData.get(mk);
         if (md) md.collected += Number(p.amount_paid || 0);
       });
