@@ -89,26 +89,40 @@ export const useCreateCouponHandover = () => {
         .single();
       if (cErr) throw cErr;
 
-      // Hitung kupon terakhir yang benar-benar lunas dari payment_logs
-      // (lebih akurat daripada current_installment_index yang bisa stale).
-      const { data: lastPaid, error: lpErr } = await supabase
-        .from('payment_logs')
-        .select('installment_index')
-        .eq('contract_id', data.contract_id)
-        .order('installment_index', { ascending: false })
-        .limit(1);
-      if (lpErr) throw lpErr;
-      const effectivePaidIndex = Math.max(
-        lastPaid?.[0]?.installment_index ?? 0,
-        contract.current_installment_index ?? 0,
-      );
-
-      const expectedStartIndex = effectivePaidIndex + 1;
-      if (data.start_index !== expectedStartIndex) {
-        throw new Error(`Kupon awal harus ${expectedStartIndex}`);
+      // Validasi DB: ambil semua installment_index lunas dari payment_logs
+      // (paginated) dan cari kupon terkecil yang BELUM lunas (gap-aware).
+      const paidAll: number[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: chunk, error: lpErr } = await supabase
+          .from('payment_logs')
+          .select('installment_index')
+          .eq('contract_id', data.contract_id)
+          .order('installment_index', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (lpErr) throw lpErr;
+        if (!chunk || chunk.length === 0) break;
+        for (const r of chunk) paidAll.push(r.installment_index as number);
+        if (chunk.length < PAGE) break;
       }
-      if (data.end_index > (contract.tenor_days ?? 0)) {
-        throw new Error(`Kupon akhir melebihi tenor (${contract.tenor_days})`);
+      const paidSet = new Set<number>(paidAll);
+      const tenor = contract.tenor_days ?? 0;
+      let expectedStartIndex = tenor + 1;
+      for (let i = 1; i <= tenor; i++) {
+        if (!paidSet.has(i)) { expectedStartIndex = i; break; }
+      }
+
+      if (data.start_index !== expectedStartIndex) {
+        throw new Error(`Kupon awal harus ${expectedStartIndex} (mengikuti data pembayaran terbaru di database)`);
+      }
+      // Pastikan tidak ada kupon dalam range yang sudah lunas di DB.
+      for (let i = data.start_index; i <= data.end_index; i++) {
+        if (paidSet.has(i)) {
+          throw new Error(`Kupon ${i} sudah lunas di database, kurangi jumlah kupon`);
+        }
+      }
+      if (data.end_index > tenor) {
+        throw new Error(`Kupon akhir melebihi tenor (${tenor})`);
       }
 
       const { data: result, error } = await supabase
