@@ -75,21 +75,33 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
   const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['monthly_performance_contract_v4', monthStart, monthEnd],
+    queryKey: ['monthly_performance_contract_v5', monthStart, monthEnd],
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
+      const startISO = `${monthStart}T00:00:00.000Z`;
+      const endISO = `${monthEnd}T23:59:59.999Z`;
       const [
         { data: agents, error: agentsError },
         contracts,
+        returnedThisPeriod,
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code').order('name'),
+        // INCLUDE returned — Omset_Awal immutable di bulan start_date
         fetchAll<any>(() => supabase
           .from('credit_contracts')
           .select('id, omset, total_loan_amount, sales_agent_id, start_date, status, tenor_days, daily_installment_amount')
-          .neq('status', 'returned')
           .gte('start_date', monthStart)
           .lte('start_date', monthEnd)
           .order('start_date', { ascending: true })
+          .order('id', { ascending: true })
+        ),
+        // Penyesuaian: kontrak yang di-return di periode ini
+        fetchAll<any>(() => supabase
+          .from('credit_contracts')
+          .select('id, omset, total_loan_amount, sales_agent_id, returned_at')
+          .eq('status', 'returned')
+          .gte('returned_at', startISO)
+          .lte('returned_at', endISO)
           .order('id', { ascending: true })
         ),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
