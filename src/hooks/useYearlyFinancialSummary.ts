@@ -334,6 +334,35 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         });
       });
 
+      // ===== Penyesuaian Retur =====
+      // Kurangi omset/modal/profit pada bulan returned_at (bulan pengajuan retur).
+      // Tidak mengubah bulan start_date asli (Omset_Awal immutable).
+      (returnedThisYear || []).forEach((rc: any) => {
+        if (!rc.returned_at) return;
+        const retMonthKey = format(new Date(rc.returned_at), 'yyyy-MM');
+        const md = monthlyData.get(retMonthKey);
+        if (!md) return;
+        const omsetFull = Number(rc.total_loan_amount || 0);
+        const modalFull = Number(rc.omset || 0);
+        const profitFull = omsetFull - modalFull;
+
+        md.total_omset -= omsetFull;
+        md.total_modal -= modalFull;
+        md.profit -= profitFull;
+        totalOmset -= omsetFull;
+        totalModal -= modalFull;
+
+        const agentId = rc.sales_agent_id;
+        if (agentId) {
+          const agentMonth = monthlyAgentOmset.get(retMonthKey);
+          if (agentMonth) {
+            agentMonth.set(agentId, (agentMonth.get(agentId) || 0) - omsetFull);
+          }
+          agentYearlyOmset.set(agentId, (agentYearlyOmset.get(agentId) || 0) - omsetFull);
+          agentYearlyModal.set(agentId, (agentYearlyModal.get(agentId) || 0) - modalFull);
+        }
+      });
+
       // TERTAGIH bulanan — CONTRACT BASIS (CONSISTENT DENGAN MONTHLY):
       // Setiap pembayaran dialokasikan ke bulan start_date kontrak (bukan payment_date).
       // Hanya pembayaran untuk kontrak tahun ini yang diikutsertakan.
