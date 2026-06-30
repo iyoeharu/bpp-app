@@ -55,12 +55,30 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const [contractOpen, setContractOpen] = useState(false);
 
   const selectedContract = contracts?.find(c => c.id === contractId);
-  const autoStartIndex = selectedContract ? selectedContract.current_installment_index + 1 : 1;
+
+  // Sinkron dengan database: hitung MAX(installment_index) aktual dari payment_logs
+  // agar Range Kupon tidak melenceng dari current_installment_index yang mungkin stale.
+  const { data: actualPaidIndex } = useQuery({
+    queryKey: ['handover_form_paid_index', contractId],
+    enabled: !!contractId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payment_logs')
+        .select('installment_index')
+        .eq('contract_id', contractId)
+        .order('installment_index', { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0]?.installment_index ?? 0;
+    },
+  });
+  const effectivePaidIndex = actualPaidIndex ?? selectedContract?.current_installment_index ?? 0;
+  const autoStartIndex = selectedContract ? effectivePaidIndex + 1 : 1;
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
   const endIndex = autoEndIndex;
   const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
-  const maxCoupons = selectedContract ? selectedContract.tenor_days - selectedContract.current_installment_index : 0;
+  const maxCoupons = selectedContract ? selectedContract.tenor_days - effectivePaidIndex : 0;
   const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= selectedContract.tenor_days;
   const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
