@@ -3,7 +3,6 @@ import { Check, ChevronsUpDown, Send, Users, FileText, Calendar, MessageSquare, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -54,10 +53,14 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const [contractOpen, setContractOpen] = useState(false);
 
   const selectedContract = contracts?.find(c => c.id === contractId);
-  const startIndex = selectedContract ? selectedContract.current_installment_index + 1 : 1;
-  const endIndex = startIndex + couponCount - 1;
+  const autoStartIndex = selectedContract ? selectedContract.current_installment_index + 1 : 1;
+  const autoEndIndex = autoStartIndex + couponCount - 1;
+  const startIndex = autoStartIndex;
+  const endIndex = autoEndIndex;
+  const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
   const maxCoupons = selectedContract ? selectedContract.tenor_days - selectedContract.current_installment_index : 0;
-  const canSubmit = !!collectorId && !!contractId && couponCount >= 1 && couponCount <= maxCoupons && !isSubmitting;
+  const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= selectedContract.tenor_days;
+  const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
   const filteredContracts = collectorId
@@ -96,14 +99,18 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
       toast.error("Lengkapi semua field yang wajib diisi");
       return;
     }
-    if (couponCount > maxCoupons) {
+    if (!isRangeValid) {
+      toast.error("Range kupon tidak valid");
+      return;
+    }
+    if (derivedCouponCount > maxCoupons) {
       toast.error(`Maksimal kupon yang bisa diambil: ${maxCoupons}`);
       return;
     }
     await onSubmit({
       collector_id: collectorId,
       contract_id: contractId,
-      coupon_count: couponCount,
+      coupon_count: derivedCouponCount,
       start_index: startIndex,
       end_index: endIndex,
       handover_date: handoverDate,
@@ -113,6 +120,10 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     setContractId("");
     setCouponCount(1);
     setNotes("");
+  };
+  const handleCouponCountChange = (value: string) => {
+    const next = Math.max(1, parseInt(value) || 1);
+    setCouponCount(next);
   };
 
   // Enter untuk submit ketika semua syarat terpenuhi
@@ -166,22 +177,25 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                   min={1}
                   max={maxCoupons || 999}
                   value={couponCount}
-                  onChange={e => setCouponCount(parseInt(e.target.value) || 1)}
+                  onChange={e => handleCouponCountChange(e.target.value)}
                   className="text-center font-semibold h-12 bg-white dark:bg-gray-900 border-orange-300 dark:border-orange-700"
                 />
                 {/* Real-time range preview tepat di bawah input jumlah kupon */}
                 <div className="rounded-md border border-orange-300/60 dark:border-orange-700/60 bg-orange-50/70 dark:bg-orange-950/30 px-3 py-2">
                   {selectedContract ? (
-                    couponCount > 0 ? (
+                    derivedCouponCount > 0 ? (
                       <div className="space-y-0.5">
                         <p className="text-xs text-gray-600 dark:text-gray-300">
                           Range Kupon:{" "}
                           <span className="font-bold text-orange-700 dark:text-orange-300">
-                            #{startIndex} – #{endIndex}
+                            {startIndex} - {endIndex}
                           </span>
                         </p>
                         <p className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                          Total: {formatRupiah(couponCount * selectedContract.daily_installment_amount)}
+                          Total: {formatRupiah(derivedCouponCount * selectedContract.daily_installment_amount)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Edit range dipindahkan ke tab Input Pembayaran, kolom Range Kupon pada daftar penagihan hari ini.
                         </p>
                       </div>
                     ) : (

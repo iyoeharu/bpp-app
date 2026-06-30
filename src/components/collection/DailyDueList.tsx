@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CalendarClock, CheckCircle2, AlertTriangle, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { formatRupiah } from "@/lib/format";
 import { useCouponHandovers, type CouponHandover } from "@/hooks/useCouponHandovers";
+import { useResetCouponRange } from "@/hooks/useCouponRangeReset";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLogActivity } from "@/hooks/useActivityLog";
@@ -88,6 +89,16 @@ interface DueRow {
   status: "unpaid" | "partial" | "paid";
 }
 
+interface RangeEditTarget {
+  handover_ids: string[];
+  contract_id: string;
+  contract_ref: string;
+  customer_name: string;
+  collector_name: string | null;
+  start_index: number;
+  end_index: number;
+}
+
 function buildRow(h: CouponHandover): DueRow | null {
   if (!h.credit_contracts) return null;
   const currentIndex = h.credit_contracts.current_installment_index || 0;
@@ -142,6 +153,7 @@ export function DailyDueList({
 }) {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
+  const resetCouponRange = useResetCouponRange();
   const { data: handovers, isLoading } = useCouponHandovers(selectedDate);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -186,6 +198,12 @@ export function DailyDueList({
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [extraNote, setExtraNote] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [rangeEditTarget, setRangeEditTarget] = useState<RangeEditTarget | null>(null);
+  const [rangeEditStart, setRangeEditStart] = useState<number>(1);
+  const [rangeEditEnd, setRangeEditEnd] = useState<number>(1);
+  const [rangeEditReason, setRangeEditReason] = useState<string>("");
+  const [rangeEditPassword, setRangeEditPassword] = useState<string>("");
+  const [rangeEditSubmitting, setRangeEditSubmitting] = useState(false);
 
   const selectedTotalPaid = selected ? selected.reduce((s, r) => s + r.paid_count, 0) : 0;
   const selectedTotalAmount = selected
@@ -206,6 +224,64 @@ export function DailyDueList({
     setSelected(null);
     setReturnedCount(0);
     setExtraNote("");
+  };
+
+  const openRangeEditDialog = (target: RangeEditTarget) => {
+    setRangeEditTarget(target);
+    setRangeEditStart(target.start_index);
+    setRangeEditEnd(target.end_index);
+    setRangeEditReason("");
+    setRangeEditPassword("");
+  };
+
+  const closeRangeEditDialog = () => {
+    setRangeEditTarget(null);
+    setRangeEditReason("");
+    setRangeEditPassword("");
+  };
+
+  const handleRangeEditSubmit = async () => {
+    if (!rangeEditTarget) return;
+    if (!rangeEditPassword.trim()) {
+      toast.error("Password admin wajib diisi");
+      return;
+    }
+    if (rangeEditStart < 1 || rangeEditEnd < rangeEditStart) {
+      toast.error("Range kupon tidak valid");
+      return;
+    }
+
+    setRangeEditSubmitting(true);
+    try {
+      const result = await resetCouponRange.mutateAsync({
+        contractId: rangeEditTarget.contract_id,
+        startIndex: rangeEditStart,
+        endIndex: rangeEditEnd,
+        handoverIds: rangeEditTarget.handover_ids,
+        reason: rangeEditReason.trim() || undefined,
+        adminPassword: rangeEditPassword,
+      });
+
+      toast.success(
+        `Range ${rangeEditTarget.contract_ref} diperbarui. ${result?.deleted_payment_count ?? 0} pembayaran dihapus dan status disinkronkan.`,
+      );
+      logActivity.mutate({
+        action: "DAILY_COLLECTION",
+        entity_type: "payment",
+        entity_id: null,
+        description:
+          `Edit range kupon ${rangeEditTarget.contract_ref} (${rangeEditTarget.customer_name}) ` +
+          `dari ${rangeEditStart}-${rangeEditEnd}` +
+          (rangeEditReason.trim() ? ` — Alasan: ${rangeEditReason.trim()}` : ""),
+        contract_id: rangeEditTarget.contract_id,
+      });
+      closeRangeEditDialog();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Terjadi kesalahan";
+      toast.error(`Gagal memperbarui range kupon: ${msg}`);
+    } finally {
+      setRangeEditSubmitting(false);
+    }
   };
 
   // Core processor — modal "Belum Bayar": rollback N kupon LUNAS terakhir menjadi unpaid.
@@ -403,6 +479,46 @@ export function DailyDueList({
                       : allUnpaid
                         ? "unpaid"
                         : "partial";
+                    const mergedRanges: RangeEditTarget[] = [];
+                    const byContract = new Map<string, DueRow[]>();
+                    for (const batch of group.batches) {
+                      const arr = byContract.get(batch.contract_ref) || [];
+                      arr.push(batch);
+                      byContract.set(batch.contract_ref, arr);
+                    }
+                    for (const [ref, batches] of byContract.entries()) {
+                      const sorted = [...batches].sort((a, b) => a.start_index - b.start_index);
+                      let current = {
+                        handover_ids: [sorted[0].handover_id],
+                        contract_id: sorted[0].contract_id,
+                        contract_ref: ref,
+                        customer_name: group.customer_name,
+                        collector_name: sorted[0].collector_name,
+                        start_index: sorted[0].start_index,
+                        end_index: sorted[0].end_index,
+                      };
+
+                      for (let i = 1; i < sorted.length; i++) {
+                        const next = sorted[i];
+                        if (next.start_index <= current.end_index + 1) {
+                          current.end_index = Math.max(current.end_index, next.end_index);
+                          current.handover_ids.push(next.handover_id);
+                        } else {
+                          mergedRanges.push({ ...current });
+                          current = {
+                            handover_ids: [next.handover_id],
+                            contract_id: next.contract_id,
+                            contract_ref: ref,
+                            customer_name: group.customer_name,
+                            collector_name: next.collector_name,
+                            start_index: next.start_index,
+                            end_index: next.end_index,
+                          };
+                        }
+                      }
+                      mergedRanges.push({ ...current });
+                    }
+
                     return (
                       <TableRow key={group.customer_name}>
                         <TableCell className="font-mono text-sm">
@@ -416,39 +532,26 @@ export function DailyDueList({
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex flex-wrap items-center justify-center gap-1">
-                            {(() => {
-                              // Gabungkan range per kontrak: 1-10 + 10-15 (atau 11-15) → 1-15
-                              const byContract = new Map<string, { start: number; end: number }[]>();
-                              for (const b of group.batches) {
-                                const arr = byContract.get(b.contract_ref) || [];
-                                arr.push({ start: b.start_index, end: b.end_index });
-                                byContract.set(b.contract_ref, arr);
-                              }
-                              const merged: { ref: string; start: number; end: number }[] = [];
-                              for (const [ref, intervals] of byContract.entries()) {
-                                intervals.sort((a, b) => a.start - b.start);
-                                let cur = { ...intervals[0] };
-                                for (let i = 1; i < intervals.length; i++) {
-                                  const nx = intervals[i];
-                                  if (nx.start <= cur.end + 1) {
-                                    cur.end = Math.max(cur.end, nx.end);
-                                  } else {
-                                    merged.push({ ref, ...cur });
-                                    cur = { ...nx };
-                                  }
-                                }
-                                merged.push({ ref, ...cur });
-                              }
-                              return merged.map((m, i) => (
+                            {mergedRanges.map((m, i) => (
+                              <div key={`${m.contract_ref}-${i}`} className="flex items-center gap-1">
                                 <Badge
-                                  key={`${m.ref}-${i}`}
                                   variant="secondary"
                                   className="font-mono text-xs"
                                 >
-                                  {m.start}-{m.end}
+                                  {m.start_index}-{m.end_index}
                                 </Badge>
-                              ));
-                            })()}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-[10px] text-orange-700 hover:text-orange-800 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
+                                  onClick={() => openRangeEditDialog(m)}
+                                >
+                                  <Pencil className="mr-1 h-3 w-3" />
+                                  Edit
+                                </Button>
+                              </div>
+                            ))}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -612,6 +715,114 @@ export function DailyDueList({
               variant="destructive"
             >
               {submitting ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!rangeEditTarget} onOpenChange={(o) => !o && closeRangeEditDialog()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-orange-600" />
+              Edit Range Kupon
+            </DialogTitle>
+            <DialogDescription>
+              {rangeEditTarget
+                ? `${rangeEditTarget.contract_ref} • ${rangeEditTarget.customer_name}`
+                : "Pilih range untuk diubah"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {rangeEditTarget && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Range aktif:</span>
+                  <span className="font-semibold font-mono">
+                    {rangeEditTarget.start_index}-{rangeEditTarget.end_index}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Kolektor:</span>
+                  <span className="font-semibold">{rangeEditTarget.collector_name || "-"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="range-edit-start" className="text-sm font-medium">
+                    Range Awal
+                  </Label>
+                  <Input
+                    id="range-edit-start"
+                    type="number"
+                    min={1}
+                    value={rangeEditStart}
+                    onChange={(e) => setRangeEditStart(Math.max(1, parseInt(e.target.value) || 1))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="range-edit-end" className="text-sm font-medium">
+                    Range Akhir
+                  </Label>
+                  <Input
+                    id="range-edit-end"
+                    type="number"
+                    min={rangeEditStart}
+                    value={rangeEditEnd}
+                    onChange={(e) =>
+                      setRangeEditEnd(Math.max(rangeEditStart, parseInt(e.target.value) || rangeEditStart))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="range-edit-password" className="text-sm font-medium">
+                  Password Admin
+                </Label>
+                <Input
+                  id="range-edit-password"
+                  type="password"
+                  value={rangeEditPassword}
+                  onChange={(e) => setRangeEditPassword(e.target.value)}
+                  placeholder="Masukkan password admin"
+                  autoComplete="current-password"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Password diverifikasi terhadap admin password yang tersimpan di sistem.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="range-edit-reason" className="text-sm font-medium">
+                  Alasan Koreksi <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
+                </Label>
+                <Textarea
+                  id="range-edit-reason"
+                  value={rangeEditReason}
+                  onChange={(e) => setRangeEditReason(e.target.value)}
+                  placeholder="Contoh: koreksi kelebihan input pembayaran / voucher"
+                  rows={3}
+                />
+              </div>
+
+              <Alert>
+                <AlertDescription>
+                  Sistem akan menghapus pembayaran pada range ini, mengembalikan status kupon,
+                  lalu menghitung ulang status kontrak dan saldo.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRangeEditDialog} disabled={rangeEditSubmitting}>
+              Batal
+            </Button>
+            <Button onClick={handleRangeEditSubmit} disabled={rangeEditSubmitting} variant="destructive">
+              {rangeEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </DialogFooter>
         </DialogContent>

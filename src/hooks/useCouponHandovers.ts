@@ -74,9 +74,35 @@ export const useCreateCouponHandover = () => {
       handover_date: string;
       notes?: string;
     }) => {
+      const normalizedCouponCount = data.end_index - data.start_index + 1;
+      if (data.start_index < 1 || data.end_index < data.start_index) {
+        throw new Error('Range kupon tidak valid');
+      }
+      if (normalizedCouponCount !== data.coupon_count) {
+        throw new Error('Jumlah kupon tidak sinkron dengan range kupon');
+      }
+
+      const { data: contract, error: cErr } = await supabase
+        .from('credit_contracts')
+        .select('daily_installment_amount, current_installment_index, tenor_days')
+        .eq('id', data.contract_id)
+        .single();
+      if (cErr) throw cErr;
+
+      const expectedStartIndex = (contract.current_installment_index ?? 0) + 1;
+      if (data.start_index !== expectedStartIndex) {
+        throw new Error(`Kupon awal harus ${expectedStartIndex}`);
+      }
+      if (data.end_index > (contract.tenor_days ?? 0)) {
+        throw new Error(`Kupon akhir melebihi tenor (${contract.tenor_days})`);
+      }
+
       const { data: result, error } = await supabase
         .from('coupon_handovers')
-        .insert(data)
+        .insert({
+          ...data,
+          coupon_count: normalizedCouponCount,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -85,13 +111,6 @@ export const useCreateCouponHandover = () => {
       // tercatat LUNAS di payment_logs. User hanya perlu menandai "Belum Bayar"
       // jika ada kupon yang tidak terbayar (akan dihapus dari payment_logs lewat modal).
       try {
-        const { data: contract, error: cErr } = await supabase
-          .from('credit_contracts')
-          .select('daily_installment_amount, current_installment_index, tenor_days')
-          .eq('id', data.contract_id)
-          .single();
-        if (cErr) throw cErr;
-
         const indices: number[] = [];
         for (let i = data.start_index; i <= data.end_index; i++) indices.push(i);
 
