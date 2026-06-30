@@ -89,7 +89,21 @@ export const useCreateCouponHandover = () => {
         .single();
       if (cErr) throw cErr;
 
-      const expectedStartIndex = (contract.current_installment_index ?? 0) + 1;
+      // Hitung kupon terakhir yang benar-benar lunas dari payment_logs
+      // (lebih akurat daripada current_installment_index yang bisa stale).
+      const { data: lastPaid, error: lpErr } = await supabase
+        .from('payment_logs')
+        .select('installment_index')
+        .eq('contract_id', data.contract_id)
+        .order('installment_index', { ascending: false })
+        .limit(1);
+      if (lpErr) throw lpErr;
+      const effectivePaidIndex = Math.max(
+        lastPaid?.[0]?.installment_index ?? 0,
+        contract.current_installment_index ?? 0,
+      );
+
+      const expectedStartIndex = effectivePaidIndex + 1;
       if (data.start_index !== expectedStartIndex) {
         throw new Error(`Kupon awal harus ${expectedStartIndex}`);
       }
