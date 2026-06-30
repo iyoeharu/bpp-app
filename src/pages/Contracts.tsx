@@ -885,8 +885,9 @@ export default function Contracts() {
       setReturnDialogOpen(false);
       setSelectedContract(null);
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal me-return kontrak");
+      console.error('Return contract error:', error);
+      const msg = error instanceof Error ? error.message : 'Gagal me-return kontrak';
+      toast.error(msg);
     }
   };
 
