@@ -1,10 +1,11 @@
--- Allow 'returned' (macet permanen) status on credit_contracts.
--- Versi robust: drop semua CHECK constraint status walaupun nama constraint berbeda.
+-- Fix Return Kontrak agar aman pada database yang constraint status-nya berbeda nama.
+-- Jalankan sekali di SQL Editor.
 
 DO $$
 DECLARE
   r record;
 BEGIN
+  -- Drop semua CHECK constraint pada credit_contracts yang mengandung kolom status.
   FOR r IN
     SELECT conname
     FROM pg_constraint
@@ -35,4 +36,5 @@ CREATE INDEX IF NOT EXISTS idx_credit_contracts_returned_at
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.credit_contracts TO authenticated;
 GRANT ALL ON public.credit_contracts TO service_role;
 
+-- Paksa PostgREST refresh schema cache agar kolom returned_at langsung dikenali oleh API.
 NOTIFY pgrst, 'reload schema';

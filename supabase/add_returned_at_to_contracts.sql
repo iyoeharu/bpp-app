@@ -14,3 +14,5 @@ WHERE status = 'returned' AND returned_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_credit_contracts_returned_at
   ON public.credit_contracts(returned_at)
   WHERE status = 'returned';
+
+NOTIFY pgrst, 'reload schema';
