@@ -82,6 +82,35 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
             </div>
           </div>
 
+          {(data?.return_adjustments?.length ?? 0) > 0 && (
+            <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                  Penyesuaian Retur Periode Ini ({data?.return_adjustments?.length})
+                </p>
+                <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                  −{formatRupiah(data?.total_return_omset ?? 0)}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Omset awal kontrak tetap (immutable) di bulan dibuatnya. Retur dialokasikan ke bulan pengajuan.
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {data?.return_adjustments?.map((r) => (
+                  <div key={r.contract_id} className="flex justify-between text-xs gap-2">
+                    <span className="font-mono">{r.contract_ref}</span>
+                    <span className="flex-1 truncate text-muted-foreground">
+                      {r.customer_name} · {r.sales_code !== '-' ? r.sales_code : r.sales_name}
+                    </span>
+                    <span className="text-red-600 font-medium whitespace-nowrap">
+                      −{formatRupiah(r.omset)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
               <h3 className="text-sm font-semibold">Detail Kontrak ({filteredContracts.length})</h3>
@@ -115,7 +144,12 @@ export function OmsetDetailDialog({ open, onOpenChange, title, data }: Props) {
                   ) : filteredContracts.map((c) => (
                     <TableRow key={c.contract_id}>
                       <TableCell className="whitespace-nowrap">{format(new Date(c.start_date), 'dd MMM yyyy', { locale: idLocale })}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.contract_ref}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <div className="flex items-center gap-1">
+                          {c.contract_ref}
+                          {c.is_returned && <Badge variant="destructive" className="text-[10px] px-1 py-0">Retur</Badge>}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="font-medium">{c.customer_name}</div>
                         {c.customer_phone && <div className="text-xs text-muted-foreground">{c.customer_phone}</div>}
