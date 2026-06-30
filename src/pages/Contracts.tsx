@@ -138,6 +138,31 @@ export default function Contracts() {
   const [pendingPrintContract, setPendingPrintContract] = useState<ContractWithCustomer | null>(null);
   const [pendingPrintCoupons, setPendingPrintCoupons] = useState<InstallmentCoupon[] | null>(null);
   const [selectedContract, setSelectedContract] = useState<ContractWithCustomer | null>(null);
+
+  // Sinkron "Terbayar" dengan database: hitung distinct installment_index dari payment_logs
+  // untuk semua kontrak milik pelanggan yang sedang dibuka (bypass current_installment_index).
+  const selectedCustomerContractIds = (contracts || [])
+    .filter(c => selectedContract && c.customer_id === selectedContract.customer_id)
+    .map(c => c.id);
+  const { data: paidCountsByContract } = useQuery({
+    queryKey: ['contracts_paid_counts', selectedContract?.customer_id, selectedCustomerContractIds.sort().join(',')],
+    enabled: !!selectedContract && selectedCustomerContractIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payment_logs')
+        .select('contract_id, installment_index')
+        .in('contract_id', selectedCustomerContractIds);
+      if (error) throw error;
+      const map = new Map<string, Set<number>>();
+      (data || []).forEach((r: { contract_id: string; installment_index: number }) => {
+        if (!map.has(r.contract_id)) map.set(r.contract_id, new Set());
+        map.get(r.contract_id)!.add(r.installment_index);
+      });
+      const out: Record<string, number> = {};
+      map.forEach((s, k) => { out[k] = s.size; });
+      return out;
+    },
+  });
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
   
