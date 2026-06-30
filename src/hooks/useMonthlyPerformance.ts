@@ -79,6 +79,25 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
     queryFn: async (): Promise<MonthlyPerformanceSummary> => {
       const startISO = `${monthStart}T00:00:00.000Z`;
       const endISO = `${monthEnd}T23:59:59.999Z`;
+
+      // Fetch retur secara terpisah dengan fallback agar kolom `returned_at` yang
+      // belum ter-migrasi tidak menggagalkan seluruh dashboard.
+      const fetchReturnedThisPeriod = async (): Promise<any[]> => {
+        try {
+          return await fetchAll<any>(() => supabase
+            .from('credit_contracts')
+            .select('id, omset, total_loan_amount, sales_agent_id, returned_at')
+            .eq('status', 'returned')
+            .gte('returned_at', startISO)
+            .lte('returned_at', endISO)
+            .order('id', { ascending: true })
+          );
+        } catch (e) {
+          console.warn('[useMonthlyPerformance] returned_at fallback:', (e as Error).message);
+          return [];
+        }
+      };
+
       const [
         { data: agents, error: agentsError },
         contracts,
@@ -95,15 +114,7 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
           .order('start_date', { ascending: true })
           .order('id', { ascending: true })
         ),
-        // Penyesuaian: kontrak yang di-return di periode ini
-        fetchAll<any>(() => supabase
-          .from('credit_contracts')
-          .select('id, omset, total_loan_amount, sales_agent_id, returned_at')
-          .eq('status', 'returned')
-          .gte('returned_at', startISO)
-          .lte('returned_at', endISO)
-          .order('id', { ascending: true })
-        ),
+        fetchReturnedThisPeriod(),
         supabase.from('commission_tiers').select('*').order('min_amount', { ascending: true }),
       ]);
 
