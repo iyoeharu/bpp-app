@@ -1914,7 +1914,7 @@ export default function Contracts() {
                                 </TableHeader>
                                 <TableBody>
                                   {customerContracts.map((c) => {
-                                    const paidCount = c.current_installment_index || 0;
+                                    const paidCount = paidCountsByContract?.[c.id] ?? (c.current_installment_index || 0);
                                     const totalCount = c.tenor_days || 0;
                                     const unpaidCount = Math.max(0, totalCount - paidCount);
                                     const perInstallment = c.daily_installment_amount || (c.total_loan_amount && totalCount ? Math.ceil(c.total_loan_amount / totalCount) : 0);
