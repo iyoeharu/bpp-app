@@ -98,11 +98,14 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
     let totalNominal = 0;
     v.detailsMap.forEach((md) => {
       const daily = md.credit_contracts?.daily_installment_amount || 0;
+      // Sinkronkan kupon bawa dengan range No Kupon (end - start + 1)
+      const derivedCount = Math.max(0, (md.end_index || 0) - (md.start_index || 0) + 1);
+      md.coupon_count = derivedCount;
       const merged: EnrichedHandover = {
         id: md.contract_id || md.contract_id || '',
         collector_id: collectorId,
         contract_id: md.contract_id,
-        coupon_count: md.coupon_count,
+        coupon_count: derivedCount,
         start_index: md.start_index,
         end_index: md.end_index,
         handover_date: selectedDate,
@@ -120,9 +123,10 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
         },
       } as EnrichedHandover;
       handoverArr.push(merged);
-      totalKupon += md.coupon_count || 0;
-      totalNominal += (md.coupon_count || 0) * daily;
+      totalKupon += derivedCount;
+      totalNominal += derivedCount * daily;
     });
+
 
     byCollector.set(collectorId, {
       collector_id: collectorId,
