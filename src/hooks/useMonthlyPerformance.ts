@@ -134,6 +134,20 @@ export const useMonthlyPerformance = (month: Date = new Date()) => {
         agentDataMap.set(agentId, existing);
       });
 
+      // Penyesuaian retur: kurangi omset/modal agen yang kontraknya di-return periode ini
+      (returnedThisPeriod || []).forEach((c: any) => {
+        const agentId = c.sales_agent_id;
+        if (!agentId) return;
+        const existing = agentDataMap.get(agentId) || {
+          total_omset: 0,
+          total_modal: 0,
+          contract_ids: new Set<string>(),
+        };
+        existing.total_omset -= Number(c.total_loan_amount || 0);
+        existing.total_modal -= Number(c.omset || 0);
+        agentDataMap.set(agentId, existing);
+      });
+
       // TERTAGIH basis kontrak: semua payment_logs utk kontrak yg start bulan ini
       const contractIdsThisMonth = Array.from(contractAgentMap.keys());
       const collectedByAgent = new Map<string, number>();
