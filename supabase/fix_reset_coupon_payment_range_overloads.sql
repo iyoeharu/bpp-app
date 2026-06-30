@@ -62,9 +62,13 @@ begin
 
   v_handover_ids := coalesce(p_handover_ids, array[]::uuid[]);
   if array_length(v_handover_ids, 1) > 0 then
-    select min(ch.start_index), max(ch.end_index), min(ch.contract_id)
-    into v_old_start, v_old_end, v_handover_contract_id
+    select min(ch.start_index), max(ch.end_index)
+    into v_old_start, v_old_end
     from public.coupon_handovers ch where ch.id = any(v_handover_ids);
+
+    select ch.contract_id into v_handover_contract_id
+    from public.coupon_handovers ch where ch.id = any(v_handover_ids) limit 1;
+
     if v_handover_contract_id is null then raise exception 'handover tidak ditemukan'; end if;
     if v_handover_contract_id <> p_contract_id then raise exception 'handover tidak sesuai kontrak'; end if;
   else
