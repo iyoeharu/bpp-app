@@ -68,7 +68,7 @@ import { useCouponsByContract, useGenerateCoupons, InstallmentCoupon } from "@/h
 import { SearchInput } from "@/components/ui/search-input";
 import { PrintCoupon8x5 } from "@/components/print/PrintCoupon8x5";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
