@@ -1,9 +1,16 @@
--- Fix: reset_coupon_payment_range had multiple overloads sharing the same
--- 6 named parameters, causing PostgREST to fail with PGRST203
--- ("Could not choose the best candidate function") when the frontend
--- calls supabase.rpc('reset_coupon_payment_range', {...}).
+-- reset_coupon_payment_range
 --
--- Run this once in Supabase SQL Editor.
+-- Konsep baru (sinkron dengan UI "Edit Range Kupon"):
+--   - (p_start_index, p_end_index) adalah range BARU yang ingin dipertahankan.
+--   - Semua kupon di range LAMA (handover yang dipilih) yang berada DI LUAR
+--     range baru akan di-reset:
+--       * payment_logs untuk index tsb dihapus
+--       * installment_coupons.status dikembalikan ke 'unpaid'
+--       * coupon_handovers di-trim (atau dihapus jika tidak lagi overlap)
+--   - current_installment_index dihitung ulang dari MAX(payment_logs.installment_index)
+--   - Status kontrak dihitung ulang (returned tetap, completed jika >= tenor, else active)
+--
+-- Jalankan sekali di Supabase SQL Editor.
 
 drop function if exists public.reset_coupon_payment_range(uuid, integer, integer, text, text);
 drop function if exists public.reset_coupon_payment_range(uuid, integer, integer, uuid[], text, text);
@@ -83,28 +90,53 @@ begin
   if not found then raise exception 'kontrak tidak ditemukan'; end if;
   if p_end_index > v_tenor then raise exception 'kupon akhir melebihi tenor (%).', v_tenor; end if;
 
+  -- 1) Hapus payment_logs pada index di dalam range lama TAPI di luar range baru
   delete from public.payment_logs pl
   where pl.contract_id = p_contract_id
-    and pl.installment_index between v_old_start and v_old_end;
+    and pl.installment_index between v_old_start and v_old_end
+    and (pl.installment_index < p_start_index or pl.installment_index > p_end_index);
   get diagnostics v_deleted_count = row_count;
 
-  -- Reset histori serah terima: hapus handover yang tercakup range agar user
-  -- dapat membuat handover baru dengan range yang benar.
-  delete from public.coupon_handovers ch
-  where ch.contract_id = p_contract_id
-    and (
-      coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids)
-      or coalesce(array_length(v_handover_ids, 1), 0) = 0
-         and ch.start_index <= v_old_end
-         and ch.end_index   >= v_old_start
-    );
+  -- 2) Trim / hapus coupon_handovers agar selaras dengan range baru
+  --    Handover yang dipilih (atau seluruh kontrak jika tidak ada pilihan)
+  --    di luar [p_start..p_end] dihapus; yang overlap di-trim ke irisan.
+  with target_handovers as (
+    select ch.*
+    from public.coupon_handovers ch
+    where ch.contract_id = p_contract_id
+      and (
+        coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids)
+        or coalesce(array_length(v_handover_ids, 1), 0) = 0
+           and ch.start_index <= v_old_end
+           and ch.end_index   >= v_old_start
+      )
+  ),
+  to_delete as (
+    select id from target_handovers
+    where end_index < p_start_index or start_index > p_end_index
+  ),
+  deleted as (
+    delete from public.coupon_handovers ch
+    using to_delete d where ch.id = d.id
+    returning ch.id
+  )
+  update public.coupon_handovers ch
+  set start_index = greatest(ch.start_index, p_start_index),
+      end_index   = least(ch.end_index, p_end_index),
+      coupon_count = least(ch.end_index, p_end_index) - greatest(ch.start_index, p_start_index) + 1
+  from target_handovers t
+  where ch.id = t.id
+    and ch.id not in (select id from deleted)
+    and (ch.start_index < p_start_index or ch.end_index > p_end_index);
 
-  -- Reset status kupon pada range lama menjadi unpaid (belum diserahterimakan).
+  -- 3) Reset status kupon yang ter-reset menjadi 'unpaid'
   update public.installment_coupons ic
   set status = 'unpaid'
   where ic.contract_id = p_contract_id
-    and ic.installment_index between v_old_start and v_old_end;
+    and ic.installment_index between v_old_start and v_old_end
+    and (ic.installment_index < p_start_index or ic.installment_index > p_end_index);
 
+  -- 4) Hitung ulang current_installment_index dari payment_logs yang tersisa
   select coalesce(max(installment_index), 0) into v_after_current
   from public.payment_logs pl where pl.contract_id = p_contract_id;
 

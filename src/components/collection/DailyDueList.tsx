@@ -286,7 +286,9 @@ export function DailyDueList({
       });
 
       toast.success(
-        `Range ${rangeEditTarget.contract_ref} diperbarui. ${result?.deleted_payment_count ?? 0} pembayaran dihapus dan status disinkronkan.`,
+        `Range ${rangeEditTarget.contract_ref} diperbarui menjadi ${rangeEditStart}-${rangeEditEnd}. ` +
+          `${result?.deleted_payment_count ?? 0} pembayaran di luar range dihapus, serah terima lama direset, ` +
+          `form serah terima otomatis lanjut ke kupon berikutnya.`,
       );
       logActivity.mutate({
         action: "DAILY_COLLECTION",
@@ -805,7 +807,7 @@ export function DailyDueList({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="range-edit-start" className="text-sm font-medium">
-                    Range Awal
+                    Kupon Awal (dipertahankan)
                   </Label>
                   <Input
                     id="range-edit-start"
@@ -817,7 +819,7 @@ export function DailyDueList({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="range-edit-end" className="text-sm font-medium">
-                    Range Akhir
+                    Kupon Akhir (dipertahankan)
                   </Label>
                   <Input
                     id="range-edit-end"
@@ -830,6 +832,11 @@ export function DailyDueList({
                   />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Kupon di luar range baru ini akan dihapus dari serah terima &amp; pembayaran.
+                Contoh: range lama 1-38 diubah menjadi 1-35 → kupon 36-38 di-reset,
+                form serah terima otomatis lanjut ke kupon 36.
+              </p>
 
               <div className="space-y-2">
                 <Label htmlFor="range-edit-password" className="text-sm font-medium">
