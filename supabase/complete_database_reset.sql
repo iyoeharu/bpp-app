@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS public.credit_contracts (
     tenor_days integer NOT NULL DEFAULT 100,
     daily_installment_amount numeric NOT NULL DEFAULT 0,
     current_installment_index integer NOT NULL DEFAULT 0,
-    status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'completed'::text])),
+    status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'completed'::text, 'returned'::text])),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     start_date date NOT NULL DEFAULT CURRENT_DATE,
     omset numeric DEFAULT 0,
@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS public.credit_contracts (
     dp numeric NOT NULL DEFAULT 0,
     branch_origin text NOT NULL DEFAULT 'A'::text,
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    returned_at timestamp with time zone,
     CONSTRAINT credit_contracts_pkey PRIMARY KEY (id)
 );
 

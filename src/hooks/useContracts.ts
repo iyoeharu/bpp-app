@@ -20,6 +20,7 @@ export interface CreditContract {
   status: string;
   start_date: string;
   created_at: string;
+  returned_at?: string | null;
 }
 
 export interface ContractWithCustomer extends CreditContract {
@@ -143,7 +144,7 @@ export const useUpdateContract = () => {
       };
       const trackedFields = [
         'product_type', 'total_loan_amount', 'omset', 'tenor_days',
-        'daily_installment_amount', 'start_date', 'status',
+        'daily_installment_amount', 'start_date', 'status', 'returned_at',
         'sales_agent_id', 'collector_id', 'customer_id',
       ] as const;
       const changes: Record<string, { from: unknown; to: unknown }> = {};

@@ -38,8 +38,9 @@ CREATE TABLE public.credit_contracts (
   tenor_days INTEGER NOT NULL DEFAULT 100,
   daily_installment_amount NUMERIC NOT NULL DEFAULT 0,
   current_installment_index INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'returned')),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  returned_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE public.payment_logs (
