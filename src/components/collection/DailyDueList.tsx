@@ -205,19 +205,42 @@ export function DailyDueList({
   const [rangeEditPassword, setRangeEditPassword] = useState<string>("");
   const [rangeEditSubmitting, setRangeEditSubmitting] = useState(false);
 
-  const selectedTotalPaid = selected ? selected.reduce((s, r) => s + r.paid_count, 0) : 0;
-  const selectedTotalAmount = selected
-    ? selected.reduce((s, r) => s + r.paid_count * r.daily_amount, 0)
-    : 0;
+  // Dedupe paid kupon antar batch (handover bisa overlap di indeks yang sama)
+  const selectedUniquePaid = useMemo(() => {
+    if (!selected) return [] as { contract_id: string; index: number; daily_amount: number }[];
+    const seen = new Set<string>();
+    const list: { contract_id: string; index: number; daily_amount: number }[] = [];
+    for (const r of selected) {
+      for (const idx of r.paid_indices) {
+        const key = `${r.contract_id}:${idx}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        list.push({ contract_id: r.contract_id, index: idx, daily_amount: r.daily_amount });
+      }
+    }
+    return list;
+  }, [selected]);
+  const selectedTotalPaid = selectedUniquePaid.length;
+  const selectedTotalAmount = selectedUniquePaid.reduce((s, x) => s + x.daily_amount, 0);
   const selectedCustomer = selected?.[0]?.customer_name || "";
   const selectedContractRefs = selected
     ? Array.from(new Set(selected.map((r) => r.contract_ref))).join(", ")
     : "";
 
-  // Default returnedCount = semua kupon LUNAS dalam grup (rollback ke "belum bayar")
+  // Default returnedCount = semua kupon LUNAS unik dalam grup (rollback ke "belum bayar")
   const openDialog = (rows: DueRow[]) => {
     setSelected(rows);
-    setReturnedCount(rows.reduce((s, r) => s + r.paid_count, 0));
+    const seen = new Set<string>();
+    let unique = 0;
+    for (const r of rows) {
+      for (const idx of r.paid_indices) {
+        const key = `${r.contract_id}:${idx}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique++;
+      }
+    }
+    setReturnedCount(unique);
     setExtraNote("");
   };
   const closeDialog = () => {
@@ -368,19 +391,49 @@ export function DailyDueList({
       );
   };
 
-  // Submit dari modal "Belum Bayar" — distribusi rollback ke batch dari yang terbaru
+  // Submit dari modal "Belum Bayar" — distribusi rollback per kontrak dengan dedup indeks
   const handleSubmit = async () => {
     if (!selected || selected.length === 0) return;
-    let remaining = Math.max(0, Math.min(returnedCount, selectedTotalPaid));
-    // Urutkan batch: kupon LUNAS terakhir terlebih dahulu (end_index DESC)
-    const ordered = [...selected].sort((a, b) => b.end_index - a.end_index);
+    const cap = selectedTotalPaid;
+    let remaining = Math.max(0, Math.min(returnedCount, cap));
+    if (remaining <= 0) {
+      toast.info("Tidak ada kupon yang ditandai belum bayar");
+      return;
+    }
+    // Group selected rows per contract; gabungkan paid_indices (union) agar tidak double
+    const byContract = new Map<string, { rows: DueRow[]; paidIndices: number[] }>();
+    for (const r of selected) {
+      const entry = byContract.get(r.contract_id) || { rows: [], paidIndices: [] };
+      entry.rows.push(r);
+      for (const idx of r.paid_indices) {
+        if (!entry.paidIndices.includes(idx)) entry.paidIndices.push(idx);
+      }
+      byContract.set(r.contract_id, entry);
+    }
+    // Urutkan kontrak: kupon LUNAS terakhir terlebih dahulu
+    const ordered = Array.from(byContract.values())
+      .map((e) => ({ ...e, paidIndices: e.paidIndices.sort((a, b) => a - b) }))
+      .sort((a, b) => {
+        const aMax = a.paidIndices[a.paidIndices.length - 1] || 0;
+        const bMax = b.paidIndices[b.paidIndices.length - 1] || 0;
+        return bMax - aMax;
+      });
     setSubmitting(true);
     try {
-      for (const row of ordered) {
+      for (const entry of ordered) {
         if (remaining <= 0) break;
-        const take = Math.min(remaining, row.paid_count);
+        const take = Math.min(remaining, entry.paidIndices.length);
         if (take <= 0) continue;
-        await processRow(row, take, extraNote.trim());
+        // Buat synthetic row dari row pertama, override paid_indices/paid_count dengan union
+        const base = entry.rows[0];
+        const synthetic: DueRow = {
+          ...base,
+          paid_indices: entry.paidIndices,
+          paid_count: entry.paidIndices.length,
+          // handover_id untuk catatan: pakai handover dengan end_index terbesar
+          handover_id: entry.rows.reduce((acc, r) => (r.end_index > acc.end_index ? r : acc), base).handover_id,
+        };
+        await processRow(synthetic, take, extraNote.trim());
         remaining -= take;
       }
       closeDialog();
