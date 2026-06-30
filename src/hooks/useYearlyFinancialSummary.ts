@@ -131,6 +131,48 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
     queryFn: async (): Promise<YearlyFinancialSummary> => {
       const startISO = `${yearStart}T00:00:00.000Z`;
       const endISO = `${yearEnd}T23:59:59.999Z`;
+
+      // Helper utk query yg butuh kolom returned_at — fallback ke array kosong
+      // bila migrasi belum dijalankan (jangan menggagalkan seluruh dashboard).
+      const fetchContractsWithReturnedAt = async (): Promise<any[]> => {
+        try {
+          return await fetchAll<any>(() => supabase
+            .from('credit_contracts')
+            .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, returned_at, customers(name, phone)')
+            .gte('start_date', yearStart)
+            .lte('start_date', yearEnd)
+            .order('start_date', { ascending: true })
+            .order('id', { ascending: true })
+          );
+        } catch (e) {
+          console.warn('[useYearlyFinancialSummary] contracts returned_at fallback:', (e as Error).message);
+          return await fetchAll<any>(() => supabase
+            .from('credit_contracts')
+            .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)')
+            .gte('start_date', yearStart)
+            .lte('start_date', yearEnd)
+            .order('start_date', { ascending: true })
+            .order('id', { ascending: true })
+          );
+        }
+      };
+
+      const fetchReturnedThisYear = async (): Promise<any[]> => {
+        try {
+          return await fetchAll<any>(() => supabase
+            .from('credit_contracts')
+            .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, returned_at, customers(name)')
+            .eq('status', 'returned')
+            .gte('returned_at', startISO)
+            .lte('returned_at', endISO)
+            .order('id', { ascending: true })
+          );
+        } catch (e) {
+          console.warn('[useYearlyFinancialSummary] returned_at fallback:', (e as Error).message);
+          return [];
+        }
+      };
+
       const [
         { data: agents, error: agentsError },
         contracts,
@@ -139,24 +181,8 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
-        // INCLUDE returned — Omset_Awal immutable di bulan start_date
-        fetchAll<any>(() => supabase
-          .from('credit_contracts')
-          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, returned_at, customers(name, phone)')
-          .gte('start_date', yearStart)
-          .lte('start_date', yearEnd)
-          .order('start_date', { ascending: true })
-          .order('id', { ascending: true })
-        ),
-        // Penyesuaian retur: kontrak yang di-return di tahun ini (kapanpun start-nya)
-        fetchAll<any>(() => supabase
-          .from('credit_contracts')
-          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, returned_at, customers(name)')
-          .eq('status', 'returned')
-          .gte('returned_at', startISO)
-          .lte('returned_at', endISO)
-          .order('id', { ascending: true })
-        ),
+        fetchContractsWithReturnedAt(),
+        fetchReturnedThisYear(),
         fetchAll<any>(() => supabase
           .from('operational_expenses')
           .select('amount, expense_date, description, category, id')
