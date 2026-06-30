@@ -276,11 +276,12 @@ export function DailyDueList({
 
     setRangeEditSubmitting(true);
     try {
+      // Reset cakupan: SEMUA handover kontrak yang overlap dengan area reset
+      // (bukan hanya batch yang dipilih) — handoverIds sengaja tidak dikirim.
       const result = await resetCouponRange.mutateAsync({
         contractId: rangeEditTarget.contract_id,
         startIndex: rangeEditStart,
         endIndex: rangeEditEnd,
-        handoverIds: rangeEditTarget.handover_ids,
         reason: rangeEditReason.trim() || undefined,
         adminPassword: rangeEditPassword,
       });
