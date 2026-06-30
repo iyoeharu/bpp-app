@@ -161,14 +161,21 @@ export const useCreateCouponHandover = () => {
           .in('installment_index', indices);
         if (couponErr) console.warn('update installment_coupons:', couponErr.message);
 
+        // Hitung current_installment_index baru = run kontigu terbesar mulai dari 1
+        // berdasarkan kupon yang sudah lunas + kupon yang baru diserahkan.
+        const mergedPaid = new Set<number>(paidSet);
+        for (const i of indices) mergedPaid.add(i);
+        let contiguous = 0;
+        for (let i = 1; i <= tenor; i++) {
+          if (mergedPaid.has(i)) contiguous = i; else break;
+        }
         const { error: updErr } = await supabase
           .from('credit_contracts')
           .update({
-            current_installment_index: data.end_index,
-            ...(data.end_index >= (contract.tenor_days ?? 0) ? { status: 'completed' } : {}),
+            current_installment_index: contiguous,
+            ...(contiguous >= tenor ? { status: 'completed' } : {}),
           })
-          .eq('id', data.contract_id)
-          .lt('current_installment_index', data.end_index);
+          .eq('id', data.contract_id);
         if (updErr) throw updErr;
       } catch (e) {
         console.error('Auto-pay handover gagal:', e);
