@@ -79,7 +79,7 @@ export const calculateContractStatusLegacy = (contract: {
   status: string;
   current_installment_index: number;
   created_at: string;
-}): 'completed' | 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet' => {
+}): ContractStatus => {
   if (contract.status === 'completed') return 'completed';
   
   const daysSinceCreation = differenceInDays(new Date(), new Date(contract.created_at));
