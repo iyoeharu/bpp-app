@@ -40,7 +40,7 @@ export const calculateDaysSinceLastPayment = (lastPaymentDate: string | null | u
  * - kurang_lancar: Terlambat > 3 sampai 20 hari (4-20 kupon)
  * - macet        : Terlambat > 20 hari (lebih dari 20 kupon)
  */
-export type ContractStatus = 'completed' | 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet';
+export type ContractStatus = 'completed' | 'returned' | 'sangat_lancar' | 'lancar' | 'kurang_lancar' | 'macet';
 
 export interface ContractStatusInput {
   status: string; // 'completed', 'active', 'returned'
@@ -56,6 +56,7 @@ export interface ContractStatusInput {
  */
 export const determineContractStatus = (input: ContractStatusInput): ContractStatus => {
   if (input.status === 'completed') return 'completed';
+  if (input.status === 'returned') return 'returned';
 
   const lateDays = input.lateDays ?? 0;
   const gap = input.daysSinceLastPayment ?? 0;
@@ -95,6 +96,7 @@ export const calculateContractStatusLegacy = (contract: {
 export const getStatusLabel = (status: ContractStatus): string => {
   const labels: Record<ContractStatus, string> = {
     completed: 'Lunas',
+    returned: 'Macet (Return)',
     sangat_lancar: 'Sangat Lancar',
     lancar: 'Lancar',
     kurang_lancar: 'Kurang Lancar',
@@ -109,6 +111,7 @@ export const getStatusLabel = (status: ContractStatus): string => {
 export const getStatusBadgeClass = (status: ContractStatus): string => {
   const classes: Record<ContractStatus, string> = {
     completed: 'bg-blue-100 text-blue-700',
+    returned: 'bg-red-100 text-red-700',
     sangat_lancar: 'bg-green-100 text-green-700',
     lancar: 'bg-green-50 text-green-600',
     kurang_lancar: 'bg-yellow-100 text-yellow-700',
