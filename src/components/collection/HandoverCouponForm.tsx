@@ -111,7 +111,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   useEffect(() => {
     if (!selectedContract) return;
     setCouponCount(1);
-  }, [selectedContract?.id, selectedContract?.current_installment_index]);
+  }, [selectedContract?.id, selectedContract?.current_installment_index, actualPaidIndex]);
 
   // Reset kontrak jika tidak lagi sesuai filter kolektor
   useEffect(() => {
