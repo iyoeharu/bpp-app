@@ -862,6 +862,7 @@ export default function Contracts() {
       await updateContract.mutateAsync({
         id: selectedContract.id,
         status: "returned",
+        returned_at: new Date().toISOString(),
         _note: note,
       } as any);
       // Batalkan kupon yang masih unpaid agar tidak menambah outstanding/sisa tagihan
