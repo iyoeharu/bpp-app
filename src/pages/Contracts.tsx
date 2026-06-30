@@ -91,9 +91,6 @@ export default function Contracts() {
   const generateCoupons = useGenerateCoupons();
   const queryClient = useQueryClient();
 
-  // Actual paid installment counts (distinct installment_index in payment_logs) per contract,
-  // for the currently selected customer — used to keep "Terbayar" in sync with DB.
-  const selectedCustomerId = undefined as string | undefined;
 
   
   // Search state
