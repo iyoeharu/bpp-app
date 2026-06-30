@@ -24,7 +24,7 @@ ALTER TABLE public.credit_contracts
   ADD COLUMN IF NOT EXISTS returned_at timestamptz;
 
 UPDATE public.credit_contracts
-SET returned_at = COALESCE(returned_at, updated_at, created_at)
+SET returned_at = COALESCE(returned_at, created_at)
 WHERE status = 'returned'
   AND returned_at IS NULL;
 
