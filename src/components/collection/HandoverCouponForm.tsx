@@ -72,7 +72,10 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
       return data?.[0]?.installment_index ?? 0;
     },
   });
-  const effectivePaidIndex = actualPaidIndex ?? selectedContract?.current_installment_index ?? 0;
+  const effectivePaidIndex = Math.max(
+    actualPaidIndex ?? 0,
+    selectedContract?.current_installment_index ?? 0,
+  );
   const autoStartIndex = selectedContract ? effectivePaidIndex + 1 : 1;
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
