@@ -286,7 +286,9 @@ export function DailyDueList({
       });
 
       toast.success(
-        `Range ${rangeEditTarget.contract_ref} diperbarui. ${result?.deleted_payment_count ?? 0} pembayaran dihapus dan status disinkronkan.`,
+        `Range ${rangeEditTarget.contract_ref} diperbarui menjadi ${rangeEditStart}-${rangeEditEnd}. ` +
+          `${result?.deleted_payment_count ?? 0} pembayaran di luar range dihapus, serah terima lama direset, ` +
+          `form serah terima otomatis lanjut ke kupon berikutnya.`,
       );
       logActivity.mutate({
         action: "DAILY_COLLECTION",
