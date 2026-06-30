@@ -285,8 +285,23 @@ export function DailyDueList({
         adminPassword: rangeEditPassword,
       });
 
+      // Fallback: pastikan riwayat serah terima ter-clear walau fungsi SQL
+      // lama belum dimigrasi. Hapus handover yang menjadi target edit.
+      let clearedHandovers = 0;
+      if (rangeEditTarget.handover_ids && rangeEditTarget.handover_ids.length > 0) {
+        const { error: delHandoverErr, count } = await supabase
+          .from("coupon_handovers")
+          .delete({ count: "exact" })
+          .in("id", rangeEditTarget.handover_ids);
+        if (delHandoverErr) {
+          console.warn("Gagal menghapus handover lama:", delHandoverErr.message);
+        } else {
+          clearedHandovers = count ?? 0;
+        }
+      }
+
       toast.success(
-        `Range ${rangeEditTarget.contract_ref} diperbarui. ${result?.deleted_payment_count ?? 0} pembayaran dihapus dan status disinkronkan.`,
+        `Range ${rangeEditTarget.contract_ref} diperbarui. ${result?.deleted_payment_count ?? 0} pembayaran dihapus, ${clearedHandovers} riwayat serah terima dibersihkan.`,
       );
       logActivity.mutate({
         action: "DAILY_COLLECTION",
@@ -298,6 +313,8 @@ export function DailyDueList({
           (rangeEditReason.trim() ? ` — Alasan: ${rangeEditReason.trim()}` : ""),
         contract_id: rangeEditTarget.contract_id,
       });
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
       closeRangeEditDialog();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Terjadi kesalahan";
