@@ -56,33 +56,55 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
 
   const selectedContract = contracts?.find(c => c.id === contractId);
 
-  // Sinkron dengan database: hitung MAX(installment_index) aktual dari payment_logs
-  // agar Range Kupon tidak melenceng dari current_installment_index yang mungkin stale.
-  const { data: actualPaidIndex } = useQuery({
-    queryKey: ['handover_form_paid_index', contractId],
+  // Sinkron dengan database: ambil SEMUA installment_index yang sudah lunas
+  // dari payment_logs, lalu cari kupon terkecil yang BELUM lunas (gap-aware).
+  // Ini memastikan Range Kupon mengikuti kondisi nyata di database, termasuk
+  // bila ada angsuran yang di-reset di tengah (misal 54 hilang dari 1..89).
+  const { data: paidIndices } = useQuery({
+    queryKey: ['handover_form_paid_indices', contractId],
     enabled: !!contractId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payment_logs')
-        .select('installment_index')
-        .eq('contract_id', contractId)
-        .order('installment_index', { ascending: false })
-        .limit(1);
-      if (error) throw error;
-      return data?.[0]?.installment_index ?? 0;
+      const all: number[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from('payment_logs')
+          .select('installment_index')
+          .eq('contract_id', contractId)
+          .order('installment_index', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) all.push(row.installment_index as number);
+        if (data.length < PAGE) break;
+      }
+      return Array.from(new Set(all)).sort((a, b) => a - b);
     },
   });
-  const effectivePaidIndex = Math.max(
-    actualPaidIndex ?? 0,
-    selectedContract?.current_installment_index ?? 0,
-  );
-  const autoStartIndex = selectedContract ? effectivePaidIndex + 1 : 1;
+  const paidSet = new Set<number>(paidIndices ?? []);
+  const tenor = selectedContract?.tenor_days ?? 0;
+  // Cari kupon terkecil 1..tenor yang belum ada di payment_logs.
+  let firstUnpaid = tenor + 1;
+  for (let i = 1; i <= tenor; i++) {
+    if (!paidSet.has(i)) { firstUnpaid = i; break; }
+  }
+  const autoStartIndex = selectedContract ? firstUnpaid : 1;
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
   const endIndex = autoEndIndex;
   const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
-  const maxCoupons = selectedContract ? selectedContract.tenor_days - effectivePaidIndex : 0;
-  const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= selectedContract.tenor_days;
+  // Maks kupon = berapa kupon berturut-turut mulai dari firstUnpaid yang masih BELUM lunas.
+  let maxCoupons = 0;
+  if (selectedContract) {
+    for (let i = firstUnpaid; i <= tenor; i++) {
+      if (paidSet.has(i)) break;
+      maxCoupons++;
+    }
+  }
+  const overlapsPaid = selectedContract
+    ? Array.from({ length: derivedCouponCount }, (_, k) => startIndex + k).some(i => paidSet.has(i))
+    : false;
+  const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= tenor && !overlapsPaid;
   const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
