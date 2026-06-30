@@ -777,7 +777,7 @@ export function DailyDueList({
       </Dialog>
 
       <Dialog open={!!rangeEditTarget} onOpenChange={(o) => !o && closeRangeEditDialog()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[min(96vw,72rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-orange-600" />
@@ -791,90 +791,95 @@ export function DailyDueList({
           </DialogHeader>
 
           {rangeEditTarget && (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Range aktif:</span>
-                  <span className="font-semibold font-mono">
-                    {rangeEditTarget.start_index}-{rangeEditTarget.end_index}
-                  </span>
+            <div className="grid gap-6 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+              <div className="space-y-4">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Range aktif:</span>
+                    <span className="font-semibold font-mono">
+                      {rangeEditTarget.start_index}-{rangeEditTarget.end_index}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Kolektor:</span>
+                    <span className="font-semibold">{rangeEditTarget.collector_name || "-"}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Kolektor:</span>
-                  <span className="font-semibold">{rangeEditTarget.collector_name || "-"}</span>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="range-edit-start" className="text-sm font-medium">
-                    Kupon Awal (dipertahankan)
-                  </Label>
-                  <Input
-                    id="range-edit-start"
-                    type="number"
-                    min={1}
-                    value={rangeEditStart}
-                    onChange={(e) => setRangeEditStart(Math.max(1, parseInt(e.target.value) || 1))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="range-edit-end" className="text-sm font-medium">
-                    Kupon Akhir (dipertahankan)
-                  </Label>
-                  <Input
-                    id="range-edit-end"
-                    type="number"
-                    min={rangeEditStart}
-                    value={rangeEditEnd}
-                    onChange={(e) =>
-                      setRangeEditEnd(Math.max(rangeEditStart, parseInt(e.target.value) || rangeEditStart))
-                    }
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground -mt-2">
-                Kupon di luar range baru ini akan dihapus dari serah terima &amp; pembayaran.
-                Contoh: range lama 1-38 diubah menjadi 1-35 → kupon 36-38 di-reset,
-                form serah terima otomatis lanjut ke kupon 36.
-              </p>
-
-              <div className="space-y-2">
-                <Label htmlFor="range-edit-password" className="text-sm font-medium">
-                  Password Admin
-                </Label>
-                <Input
-                  id="range-edit-password"
-                  type="password"
-                  value={rangeEditPassword}
-                  onChange={(e) => setRangeEditPassword(e.target.value)}
-                  placeholder="Masukkan password admin"
-                  autoComplete="current-password"
-                />
                 <p className="text-xs text-muted-foreground">
-                  Password diverifikasi terhadap admin password yang tersimpan di sistem.
+                  Kupon di luar range baru ini akan dihapus dari serah terima &amp; pembayaran.
+                  Contoh: range lama 1-38 diubah menjadi 1-35 → kupon 36-38 di-reset,
+                  form serah terima otomatis lanjut ke kupon 36.
                 </p>
+
+                <Alert>
+                  <AlertDescription>
+                    Sistem akan menghapus pembayaran pada range ini, mengembalikan status kupon,
+                    lalu menghitung ulang status kontrak dan saldo.
+                  </AlertDescription>
+                </Alert>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="range-edit-reason" className="text-sm font-medium">
-                  Alasan Koreksi <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
-                </Label>
-                <Textarea
-                  id="range-edit-reason"
-                  value={rangeEditReason}
-                  onChange={(e) => setRangeEditReason(e.target.value)}
-                  placeholder="Contoh: koreksi kelebihan input pembayaran / voucher"
-                  rows={3}
-                />
-              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="range-edit-start" className="text-sm font-medium">
+                      Kupon Awal (dipertahankan)
+                    </Label>
+                    <Input
+                      id="range-edit-start"
+                      type="number"
+                      min={1}
+                      value={rangeEditStart}
+                      onChange={(e) => setRangeEditStart(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="range-edit-end" className="text-sm font-medium">
+                      Kupon Akhir (dipertahankan)
+                    </Label>
+                    <Input
+                      id="range-edit-end"
+                      type="number"
+                      min={rangeEditStart}
+                      value={rangeEditEnd}
+                      onChange={(e) =>
+                        setRangeEditEnd(Math.max(rangeEditStart, parseInt(e.target.value) || rangeEditStart))
+                      }
+                    />
+                  </div>
+                </div>
 
-              <Alert>
-                <AlertDescription>
-                  Sistem akan menghapus pembayaran pada range ini, mengembalikan status kupon,
-                  lalu menghitung ulang status kontrak dan saldo.
-                </AlertDescription>
-              </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="range-edit-password" className="text-sm font-medium">
+                    Password Admin
+                  </Label>
+                  <Input
+                    id="range-edit-password"
+                    type="password"
+                    value={rangeEditPassword}
+                    onChange={(e) => setRangeEditPassword(e.target.value)}
+                    placeholder="Masukkan password admin"
+                    autoComplete="current-password"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Password diverifikasi terhadap admin password yang tersimpan di sistem.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="range-edit-reason" className="text-sm font-medium">
+                    Alasan Koreksi <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
+                  </Label>
+                  <Textarea
+                    id="range-edit-reason"
+                    value={rangeEditReason}
+                    onChange={(e) => setRangeEditReason(e.target.value)}
+                    placeholder="Contoh: koreksi kelebihan input pembayaran / voucher"
+                    rows={4}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
