@@ -127,22 +127,34 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
   const yearEnd = format(endOfYear(year), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['yearly_financial_summary_contract_v4', yearStart, yearEnd, statusFilter],
+    queryKey: ['yearly_financial_summary_contract_v5', yearStart, yearEnd, statusFilter],
     queryFn: async (): Promise<YearlyFinancialSummary> => {
+      const startISO = `${yearStart}T00:00:00.000Z`;
+      const endISO = `${yearEnd}T23:59:59.999Z`;
       const [
         { data: agents, error: agentsError },
         contracts,
+        returnedThisYear,
         expenses,
         { data: tiersData, error: tiersError },
       ] = await Promise.all([
         supabase.from('sales_agents').select('id, name, agent_code'),
+        // INCLUDE returned — Omset_Awal immutable di bulan start_date
         fetchAll<any>(() => supabase
           .from('credit_contracts')
-          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, customers(name, phone)')
-          .neq('status', 'returned')
+          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, start_date, status, current_installment_index, tenor_days, created_at, product_type, customer_id, daily_installment_amount, returned_at, customers(name, phone)')
           .gte('start_date', yearStart)
           .lte('start_date', yearEnd)
           .order('start_date', { ascending: true })
+          .order('id', { ascending: true })
+        ),
+        // Penyesuaian retur: kontrak yang di-return di tahun ini (kapanpun start-nya)
+        fetchAll<any>(() => supabase
+          .from('credit_contracts')
+          .select('id, contract_ref, omset, total_loan_amount, sales_agent_id, returned_at, customers(name)')
+          .eq('status', 'returned')
+          .gte('returned_at', startISO)
+          .lte('returned_at', endISO)
           .order('id', { ascending: true })
         ),
         fetchAll<any>(() => supabase
@@ -320,6 +332,35 @@ export const useYearlyFinancialSummary = (year: Date = new Date(), statusFilter:
           start_date: contract.start_date,
           contract_ref: contract.contract_ref || (contract.id || '').toString(),
         });
+      });
+
+      // ===== Penyesuaian Retur =====
+      // Kurangi omset/modal/profit pada bulan returned_at (bulan pengajuan retur).
+      // Tidak mengubah bulan start_date asli (Omset_Awal immutable).
+      (returnedThisYear || []).forEach((rc: any) => {
+        if (!rc.returned_at) return;
+        const retMonthKey = format(new Date(rc.returned_at), 'yyyy-MM');
+        const md = monthlyData.get(retMonthKey);
+        if (!md) return;
+        const omsetFull = Number(rc.total_loan_amount || 0);
+        const modalFull = Number(rc.omset || 0);
+        const profitFull = omsetFull - modalFull;
+
+        md.total_omset -= omsetFull;
+        md.total_modal -= modalFull;
+        md.profit -= profitFull;
+        totalOmset -= omsetFull;
+        totalModal -= modalFull;
+
+        const agentId = rc.sales_agent_id;
+        if (agentId) {
+          const agentMonth = monthlyAgentOmset.get(retMonthKey);
+          if (agentMonth) {
+            agentMonth.set(agentId, (agentMonth.get(agentId) || 0) - omsetFull);
+          }
+          agentYearlyOmset.set(agentId, (agentYearlyOmset.get(agentId) || 0) - omsetFull);
+          agentYearlyModal.set(agentId, (agentYearlyModal.get(agentId) || 0) - modalFull);
+        }
       });
 
       // TERTAGIH bulanan — CONTRACT BASIS (CONSISTENT DENGAN MONTHLY):
