@@ -18,7 +18,7 @@ END $$;
 
 ALTER TABLE public.credit_contracts
   ADD CONSTRAINT credit_contracts_status_check
-  CHECK (status IN ('active', 'completed', 'returned'));
+  CHECK (status IN ('active', 'completed', 'returned')) NOT VALID;
 
 ALTER TABLE public.credit_contracts
   ADD COLUMN IF NOT EXISTS returned_at timestamptz;
