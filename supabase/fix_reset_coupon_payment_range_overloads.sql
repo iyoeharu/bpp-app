@@ -88,31 +88,22 @@ begin
     and pl.installment_index between v_old_start and v_old_end;
   get diagnostics v_deleted_count = row_count;
 
-  update public.coupon_handovers ch
-  set start_index = p_start_index,
-      end_index = p_end_index,
-      coupon_count = (p_end_index - p_start_index + 1)
+  -- Reset histori serah terima: hapus handover yang tercakup range agar user
+  -- dapat membuat handover baru dengan range yang benar.
+  delete from public.coupon_handovers ch
   where ch.contract_id = p_contract_id
-    and (coalesce(array_length(v_handover_ids, 1), 0) = 0 or ch.id = any(v_handover_ids));
+    and (
+      coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids)
+      or coalesce(array_length(v_handover_ids, 1), 0) = 0
+         and ch.start_index <= v_old_end
+         and ch.end_index   >= v_old_start
+    );
 
+  -- Reset status kupon pada range lama menjadi unpaid (belum diserahterimakan).
   update public.installment_coupons ic
   set status = 'unpaid'
   where ic.contract_id = p_contract_id
     and ic.installment_index between v_old_start and v_old_end;
-
-  insert into public.payment_logs (contract_id, payment_date, installment_index, amount_paid, collector_id, notes)
-  select p_contract_id,
-    coalesce((select min(ch.handover_date) from public.coupon_handovers ch where ch.contract_id = p_contract_id), current_date),
-    gs, cc.daily_installment_amount,
-    coalesce((select ch.collector_id from public.coupon_handovers ch where ch.contract_id = p_contract_id order by ch.created_at desc limit 1), null),
-    case when p_reason is not null and trim(p_reason) <> '' then 'Range reset: ' || p_reason else 'Range reset' end
-  from generate_series(p_start_index, p_end_index) as gs
-  cross join public.credit_contracts cc where cc.id = p_contract_id;
-
-  update public.installment_coupons ic
-  set status = 'paid'
-  where ic.contract_id = p_contract_id
-    and ic.installment_index between p_start_index and p_end_index;
 
   select coalesce(max(installment_index), 0) into v_after_current
   from public.payment_logs pl where pl.contract_id = p_contract_id;
