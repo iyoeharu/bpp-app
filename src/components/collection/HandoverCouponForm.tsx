@@ -11,6 +11,8 @@ import { formatRupiah } from "@/lib/format";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Contract {
   id: string;
