@@ -84,6 +84,15 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
   }, [selectedContract?.id, maxCoupons, couponCount]);
 
+  // Reset jumlah kupon ke 1 setiap kali kontrak berubah ATAU
+  // current_installment_index kontrak berubah (mis. setelah Edit Range Kupon).
+  // Ini memastikan form selalu otomatis lanjut ke kupon berikutnya
+  // berdasarkan range terbaru.
+  useEffect(() => {
+    if (!selectedContract) return;
+    setCouponCount(1);
+  }, [selectedContract?.id, selectedContract?.current_installment_index]);
+
   // Reset kontrak jika tidak lagi sesuai filter kolektor
   useEffect(() => {
     if (!collectorId || !contractId) return;
