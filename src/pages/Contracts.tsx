@@ -859,12 +859,29 @@ export default function Contracts() {
         variant: "destructive",
       });
       if (!note) return;
-      await updateContract.mutateAsync({
-        id: selectedContract.id,
-        status: "returned",
-        returned_at: new Date().toISOString(),
-        _note: note,
-      } as any);
+      try {
+        await updateContract.mutateAsync({
+          id: selectedContract.id,
+          status: "returned",
+          returned_at: new Date().toISOString(),
+          _note: note,
+        } as any);
+      } catch (updateError) {
+        const err = updateError as { message?: string; code?: string };
+        const isReturnedAtSchemaCacheError =
+          err.code === "PGRST204" ||
+          /returned_at|schema cache/i.test(err.message ?? "");
+
+        if (!isReturnedAtSchemaCacheError) throw updateError;
+
+        // Fallback untuk database yang constraint status-nya sudah benar,
+        // tetapi schema cache PostgREST belum mengenali kolom returned_at.
+        await updateContract.mutateAsync({
+          id: selectedContract.id,
+          status: "returned",
+          _note: `${note}\n\nCatatan sistem: returned_at belum tersedia/terbaca di schema cache saat return dieksekusi. Jalankan migration fix_contract_return_status.sql agar periode retur tercatat akurat.`,
+        } as any);
+      }
 
       // Refresh data terkait
       queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
