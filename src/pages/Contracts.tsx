@@ -865,13 +865,6 @@ export default function Contracts() {
         returned_at: new Date().toISOString(),
         _note: note,
       } as any);
-      // Batalkan kupon yang masih unpaid agar tidak menambah outstanding/sisa tagihan
-      const { error: cErr } = await supabase
-        .from("installment_coupons")
-        .update({ status: "cancelled" })
-        .eq("contract_id", selectedContract.id)
-        .eq("status", "unpaid");
-      if (cErr) console.warn("Gagal cancel kupon:", cErr);
 
       // Refresh data terkait
       queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
@@ -882,13 +875,14 @@ export default function Contracts() {
       queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract"] });
       queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary"] });
 
-      toast.success("Kontrak ditandai Macet (Return). Sisa tagihan & omset sales otomatis menyesuaikan.");
+      toast.success("Kontrak berhasil ditandai Macet (Return). Omset periode retur otomatis menyesuaikan.");
       setReturnDialogOpen(false);
       setSelectedContract(null);
     } catch (error) {
       console.error('Return contract error:', error);
-      const msg = error instanceof Error ? error.message : 'Gagal me-return kontrak';
-      toast.error(msg);
+      const err = error as { message?: string; details?: string; hint?: string; code?: string };
+      const detail = [err.message, err.details, err.hint, err.code].filter(Boolean).join(" | ");
+      toast.error(detail ? `Gagal me-return kontrak: ${detail}` : 'Gagal me-return kontrak');
     }
   };
 
@@ -1978,8 +1972,8 @@ export default function Contracts() {
               Dampak:
               <ul className="list-disc pl-5 mt-1 space-y-0.5">
                 <li>Data kontrak <b>tetap tersimpan</b> sebagai riwayat.</li>
-                <li>Sisa tagihan (kupon belum bayar) <b>dibatalkan</b> — outstanding berkurang.</li>
-                <li>Omset, modal & komisi sales dari kontrak ini <b>tidak lagi dihitung</b>.</li>
+                <li>Data historis kontrak awal <b>tidak diubah</b>.</li>
+                <li>Omset awal tetap terkunci, penyesuaian retur dihitung pada <b>bulan retur diajukan</b>.</li>
                 <li>Komisi yang sudah dibayar ke sales <b>tidak ditarik kembali</b>.</li>
               </ul>
             </AlertDialogDescription>

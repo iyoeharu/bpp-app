@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.credit_contracts (
   tenor_days integer NOT NULL DEFAULT 100,
   daily_installment_amount numeric NOT NULL DEFAULT 0,
   current_installment_index integer NOT NULL DEFAULT 0,
-  status text NOT NULL DEFAULT 'active' CHECK (status = ANY (ARRAY['active','completed'])),
+  status text NOT NULL DEFAULT 'active' CHECK (status = ANY (ARRAY['active','completed','returned'])),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   start_date date NOT NULL DEFAULT CURRENT_DATE,
   omset numeric DEFAULT 0,
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.credit_contracts (
   dp numeric NOT NULL DEFAULT 0,
   branch_origin text NOT NULL DEFAULT 'A',
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  returned_at timestamp with time zone,
   CONSTRAINT credit_contracts_pkey PRIMARY KEY (id),
   CONSTRAINT credit_contracts_contract_ref_key UNIQUE (contract_ref)
 );
