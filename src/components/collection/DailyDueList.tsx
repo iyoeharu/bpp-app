@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, AlertTriangle, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { formatRupiah } from "@/lib/format";
 import { useCouponHandovers, type CouponHandover } from "@/hooks/useCouponHandovers";
-import { useResetCouponRange } from "@/hooks/useCouponRangeReset";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLogActivity } from "@/hooks/useActivityLog";
@@ -153,7 +152,6 @@ export function DailyDueList({
 }) {
   const queryClient = useQueryClient();
   const logActivity = useLogActivity();
-  const resetCouponRange = useResetCouponRange();
   const { data: handovers, isLoading } = useCouponHandovers(selectedDate);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -222,13 +220,6 @@ export function DailyDueList({
   const [returnedCount, setReturnedCount] = useState<number>(0);
   const [extraNote, setExtraNote] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [rangeEditTarget, setRangeEditTarget] = useState<RangeEditTarget | null>(null);
-  const [rangeEditStart, setRangeEditStart] = useState<number>(1);
-  const [rangeEditEnd, setRangeEditEnd] = useState<number>(1);
-  const [rangeEditReason, setRangeEditReason] = useState<string>("");
-  const [rangeEditPassword, setRangeEditPassword] = useState<string>("");
-  const [rangeEditSubmitting, setRangeEditSubmitting] = useState(false);
-
   // Hapus kupon (delete handover batch) state
   const [deleteTarget, setDeleteTarget] = useState<RangeEditTarget | null>(null);
   const [deletePassword, setDeletePassword] = useState<string>("");
@@ -343,66 +334,6 @@ export function DailyDueList({
     setExtraNote("");
   };
 
-  const openRangeEditDialog = (target: RangeEditTarget) => {
-    setRangeEditTarget(target);
-    setRangeEditStart(target.start_index);
-    setRangeEditEnd(target.end_index);
-    setRangeEditReason("");
-    setRangeEditPassword("");
-  };
-
-  const closeRangeEditDialog = () => {
-    setRangeEditTarget(null);
-    setRangeEditReason("");
-    setRangeEditPassword("");
-  };
-
-  const handleRangeEditSubmit = async () => {
-    if (!rangeEditTarget) return;
-    if (!rangeEditPassword.trim()) {
-      toast.error("Password admin wajib diisi");
-      return;
-    }
-    if (rangeEditStart < 1 || rangeEditEnd < rangeEditStart) {
-      toast.error("Range kupon tidak valid");
-      return;
-    }
-
-    setRangeEditSubmitting(true);
-    try {
-      // Reset cakupan: hanya handover yang dipilih pada dialog ini.
-      const result = await resetCouponRange.mutateAsync({
-        contractId: rangeEditTarget.contract_id,
-        startIndex: rangeEditStart,
-        endIndex: rangeEditEnd,
-        handoverIds: rangeEditTarget.handover_ids,
-        reason: rangeEditReason.trim() || undefined,
-        adminPassword: rangeEditPassword,
-      });
-
-      toast.success(
-        `Range serah terima ${rangeEditTarget.contract_ref} diperbarui menjadi ${rangeEditStart}-${rangeEditEnd}. ` +
-          `${result?.deleted_payment_count ?? 0} pembayaran pada kupon yang dipilih di luar range baru dihapus, ` +
-          `pembayaran sebelum range terpilih tetap aman.`,
-      );
-      logActivity.mutate({
-        action: "DAILY_COLLECTION",
-        entity_type: "payment",
-        entity_id: null,
-        description:
-          `Edit range serah terima kupon ${rangeEditTarget.contract_ref} (${rangeEditTarget.customer_name}) ` +
-          `menjadi ${rangeEditStart}-${rangeEditEnd}` +
-          (rangeEditReason.trim() ? ` — Alasan: ${rangeEditReason.trim()}` : ""),
-        contract_id: rangeEditTarget.contract_id,
-      });
-      closeRangeEditDialog();
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Terjadi kesalahan";
-      toast.error(`Gagal memperbarui range kupon: ${msg}`);
-    } finally {
-      setRangeEditSubmitting(false);
-    }
-  };
 
   // Core processor — modal "Belum Bayar": rollback N kupon LUNAS terakhir menjadi unpaid.
   // Karena handover auto-mark semua kupon LUNAS, di sini kita HAPUS payment_logs untuk
@@ -687,16 +618,6 @@ export function DailyDueList({
                                   type="button"
                                   size="sm"
                                   variant="ghost"
-                                  className="h-6 px-2 text-[10px] text-orange-700 hover:text-orange-800 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
-                                  onClick={() => openRangeEditDialog(m)}
-                                >
-                                  <Pencil className="mr-1 h-3 w-3" />
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
                                   className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => openDeleteDialog(m)}
                                 >
@@ -873,131 +794,6 @@ export function DailyDueList({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!rangeEditTarget} onOpenChange={(o) => !o && closeRangeEditDialog()}>
-        <DialogContent className="w-[min(96vw,72rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5 text-orange-600" />
-              Edit Range Kupon
-            </DialogTitle>
-            <DialogDescription>
-              {rangeEditTarget
-                ? `${rangeEditTarget.contract_ref} • ${rangeEditTarget.customer_name}`
-                : "Pilih range serah terima untuk diubah"}
-            </DialogDescription>
-          </DialogHeader>
-
-          {rangeEditTarget && (
-            <div className="grid gap-6 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-              <div className="space-y-4">
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Range aktif:</span>
-                    <span className="font-semibold font-mono">
-                      {rangeEditTarget.start_index}-{rangeEditTarget.end_index}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Kolektor:</span>
-                    <span className="font-semibold">{rangeEditTarget.collector_name || "-"}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Range yang Anda pilih akan <strong>di-reset</strong> (dianggap belum terbayar).
-                  Pembayaran & serah terima di luar range tersebut tidak disentuh.
-                </p>
-
-                <Alert>
-                  <AlertDescription className="space-y-1">
-                    <p>
-                      Sistem menghapus payment_logs pada range, men-set kupon menjadi
-                      <em> unpaid</em>, dan men-trim serah terima yang overlap.
-                    </p>
-                    <p className="text-xs">
-                      <strong>Contoh:</strong> pilih 73-78, pembayaran terakhir dalam range di 76 →
-                      effective range 73-76 (untuk audit). Payment_logs 73-78 dihapus,
-                      kupon 73-78 di-set unpaid, coupon_handovers di-trim/split untuk
-                      mengeluarkan 73-78.
-                    </p>
-                  </AlertDescription>
-                </Alert>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="range-edit-start" className="text-sm font-medium">
-                      Kupon Awal (di-reset)
-                    </Label>
-                    <Input
-                      id="range-edit-start"
-                      type="number"
-                      min={1}
-                      value={rangeEditStart}
-                      onChange={(e) => setRangeEditStart(Math.max(1, parseInt(e.target.value) || 1))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="range-edit-end" className="text-sm font-medium">
-                      Kupon Akhir (di-reset)
-                    </Label>
-                    <Input
-                      id="range-edit-end"
-                      type="number"
-                      min={rangeEditStart}
-                      value={rangeEditEnd}
-                      onChange={(e) =>
-                        setRangeEditEnd(Math.max(rangeEditStart, parseInt(e.target.value) || rangeEditStart))
-                      }
-                    />
-                  </div>
-                </div>
-
-
-                <div className="space-y-2">
-                  <Label htmlFor="range-edit-password" className="text-sm font-medium">
-                    Password Admin
-                  </Label>
-                  <Input
-                    id="range-edit-password"
-                    type="password"
-                    value={rangeEditPassword}
-                    onChange={(e) => setRangeEditPassword(e.target.value)}
-                    placeholder="Masukkan password admin"
-                    autoComplete="current-password"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Password diverifikasi terhadap admin password yang tersimpan di sistem.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="range-edit-reason" className="text-sm font-medium">
-                    Alasan Koreksi <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
-                  </Label>
-                  <Textarea
-                    id="range-edit-reason"
-                    value={rangeEditReason}
-                    onChange={(e) => setRangeEditReason(e.target.value)}
-                    placeholder="Contoh: koreksi kelebihan input pembayaran / voucher"
-                    rows={4}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={closeRangeEditDialog} disabled={rangeEditSubmitting}>
-              Batal
-            </Button>
-            <Button onClick={handleRangeEditSubmit} disabled={rangeEditSubmitting} variant="destructive">
-              {rangeEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Handover Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && closeDeleteDialog()}>
@@ -1037,8 +833,7 @@ export function DailyDueList({
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <AlertDescription className="ml-2 text-xs">
                   Batch serah terima ini akan dihapus permanen dari daftar penagihan.
-                  Payment logs & status kupon <strong>tidak diubah</strong> — gunakan
-                  <em> Edit Range</em> jika ingin mereset pembayaran.
+                  Payment logs & status kupon <strong>tidak diubah</strong>.
                 </AlertDescription>
               </Alert>
 
