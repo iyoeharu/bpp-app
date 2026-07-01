@@ -65,10 +65,116 @@ function StatusBadge({ status }: { status: HandoverStatus }) {
 
 /* ─── Main Component ─── */
 export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
+  const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
   const [searchQuery, setSearchQuery] = useState("");
   // Default: hanya tampilkan yang belum bayar (sebagian/belum). Yang lunas disembunyikan
   // — sudah tersedia di Excel "Export Per Kolektor" pada tab Input Pembayaran.
   const [statusFilter, setStatusFilter] = useState<string>("unpaid_only");
+
+  // Hapus serah terima state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    contract_id: string;
+    contract_ref: string;
+    customer_name: string;
+    start_index: number;
+    end_index: number;
+  } | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTarget) return;
+    if (!deletePassword.trim()) {
+      toast.error("Password admin wajib diisi");
+      return;
+    }
+    setDeleteSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData.user?.email;
+      if (!email) {
+        toast.error("Sesi tidak valid, silakan login ulang");
+        setDeleteSubmitting(false);
+        return;
+      }
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: deletePassword,
+      });
+      if (verifyErr) {
+        toast.error("Password salah");
+        setDeleteSubmitting(false);
+        return;
+      }
+
+      const { start_index: startIdx, end_index: endIdx, contract_id: contractId } = deleteTarget;
+
+      const { error: delErr } = await supabase
+        .from("coupon_handovers").delete().eq("id", deleteTarget.id);
+      if (delErr) throw delErr;
+
+      const { error: delPayErr } = await supabase
+        .from("payment_logs").delete()
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (delPayErr) throw delPayErr;
+
+      const { error: updCouponErr } = await supabase
+        .from("installment_coupons").update({ status: "unpaid" })
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (updCouponErr) throw updCouponErr;
+
+      const newCurrent = Math.max(0, startIdx - 1);
+      const { error: updContractErr } = await supabase
+        .from("credit_contracts")
+        .update({ current_installment_index: newCurrent, status: "active" })
+        .eq("id", contractId);
+      if (updContractErr) throw updContractErr;
+
+      logActivity.mutate({
+        action: "DAILY_COLLECTION",
+        entity_type: "coupon_handover",
+        entity_id: null,
+        description:
+          `Hapus serah terima kupon ${deleteTarget.contract_ref} (${deleteTarget.customer_name}) ` +
+          `range ${startIdx}-${endIdx} — form serah terima kembali ke ${startIdx}` +
+          (deleteReason.trim() ? ` — Alasan: ${deleteReason.trim()}` : ""),
+        contract_id: contractId,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_logs"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract_v5"] });
+      queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary_contract_v5"] });
+
+      toast.success(
+        `Serah terima ${deleteTarget.contract_ref} range ${startIdx}-${endIdx} dihapus, form kembali ke kupon ${startIdx}`,
+      );
+      closeDeleteDialog();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
+      toast.error(`Gagal menghapus kupon: ${msg}`);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
 
   // Enrich handovers with status
   const enrichedHandovers = (handovers || []).map(h => ({
