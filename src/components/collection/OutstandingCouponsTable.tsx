@@ -384,6 +384,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
               <TableHead className="text-sm text-center">Kupon</TableHead>
               <TableHead className="text-sm text-center">Status</TableHead>
               <TableHead className="text-sm text-right">Nominal</TableHead>
+              <TableHead className="text-sm text-center w-16">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
