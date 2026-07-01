@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileX, Download, Clock, UserCheck, ArrowRight, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
+import { FileX, Download, Clock, UserCheck, ArrowRight, CheckCircle2, AlertTriangle, BarChart3, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,16 @@ import {
 import { CouponHandover } from "@/hooks/useCouponHandovers";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLogActivity } from "@/hooks/useActivityLog";
 
 interface Props {
   data?: unknown;
@@ -55,10 +65,116 @@ function StatusBadge({ status }: { status: HandoverStatus }) {
 
 /* ─── Main Component ─── */
 export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
+  const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
   const [searchQuery, setSearchQuery] = useState("");
   // Default: hanya tampilkan yang belum bayar (sebagian/belum). Yang lunas disembunyikan
   // — sudah tersedia di Excel "Export Per Kolektor" pada tab Input Pembayaran.
   const [statusFilter, setStatusFilter] = useState<string>("unpaid_only");
+
+  // Hapus serah terima state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    contract_id: string;
+    contract_ref: string;
+    customer_name: string;
+    start_index: number;
+    end_index: number;
+  } | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTarget) return;
+    if (!deletePassword.trim()) {
+      toast.error("Password admin wajib diisi");
+      return;
+    }
+    setDeleteSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData.user?.email;
+      if (!email) {
+        toast.error("Sesi tidak valid, silakan login ulang");
+        setDeleteSubmitting(false);
+        return;
+      }
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: deletePassword,
+      });
+      if (verifyErr) {
+        toast.error("Password salah");
+        setDeleteSubmitting(false);
+        return;
+      }
+
+      const { start_index: startIdx, end_index: endIdx, contract_id: contractId } = deleteTarget;
+
+      const { error: delErr } = await supabase
+        .from("coupon_handovers").delete().eq("id", deleteTarget.id);
+      if (delErr) throw delErr;
+
+      const { error: delPayErr } = await supabase
+        .from("payment_logs").delete()
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (delPayErr) throw delPayErr;
+
+      const { error: updCouponErr } = await supabase
+        .from("installment_coupons").update({ status: "unpaid" })
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (updCouponErr) throw updCouponErr;
+
+      const newCurrent = Math.max(0, startIdx - 1);
+      const { error: updContractErr } = await supabase
+        .from("credit_contracts")
+        .update({ current_installment_index: newCurrent, status: "active" })
+        .eq("id", contractId);
+      if (updContractErr) throw updContractErr;
+
+      logActivity.mutate({
+        action: "DAILY_COLLECTION",
+        entity_type: "coupon_handover",
+        entity_id: null,
+        description:
+          `Hapus serah terima kupon ${deleteTarget.contract_ref} (${deleteTarget.customer_name}) ` +
+          `range ${startIdx}-${endIdx} — form serah terima kembali ke ${startIdx}` +
+          (deleteReason.trim() ? ` — Alasan: ${deleteReason.trim()}` : ""),
+        contract_id: contractId,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_logs"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract_v5"] });
+      queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary_contract_v5"] });
+
+      toast.success(
+        `Serah terima ${deleteTarget.contract_ref} range ${startIdx}-${endIdx} dihapus, form kembali ke kupon ${startIdx}`,
+      );
+      closeDeleteDialog();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
+      toast.error(`Gagal menghapus kupon: ${msg}`);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
 
   // Enrich handovers with status
   const enrichedHandovers = (handovers || []).map(h => ({
@@ -268,6 +384,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
               <TableHead className="text-sm text-center">Kupon</TableHead>
               <TableHead className="text-sm text-center">Status</TableHead>
               <TableHead className="text-sm text-right">Nominal</TableHead>
+              <TableHead className="text-sm text-center w-16">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -332,6 +449,29 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
                       <p className="text-xs text-destructive">{formatRupiah(total - paidAmt)} sisa</p>
                     )}
                   </TableCell>
+
+                  <TableCell className="text-center py-3">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Hapus serah terima"
+                      onClick={() => {
+                        setDeleteTarget({
+                          id: h.id,
+                          contract_id: h.contract_id,
+                          contract_ref: h.credit_contracts?.contract_ref || '-',
+                          customer_name: h.credit_contracts?.customers?.name || '-',
+                          start_index: h.start_index,
+                          end_index: h.end_index,
+                        });
+                        setDeletePassword("");
+                        setDeleteReason("");
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -349,6 +489,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
                 <p className="text-sm">{formatRupiah(fTotal)}</p>
                 <p className="text-xs text-destructive">{formatRupiah(fTotal - fPaidAmt)} sisa</p>
               </TableCell>
+              <TableCell />
             </TableRow>
           </TableBody>
         </Table>
@@ -357,6 +498,63 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
       {totalPages > 1 && (
         <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={goToPage} totalItems={totalItems} />
       )}
+
+      {/* Dialog Hapus Serah Terima */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) closeDeleteDialog(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Hapus Serah Terima Kupon
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (
+                <>
+                  Menghapus serah terima <strong>{deleteTarget.contract_ref}</strong> ({deleteTarget.customer_name})
+                  {" "}range <strong>{deleteTarget.start_index}-{deleteTarget.end_index}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Aksi ini menghapus batch handover, membatalkan pembayaran pada range tersebut,
+              dan memundurkan form serah terima ke kupon {deleteTarget?.start_index}. Tidak dapat dibatalkan.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="del-pwd">Password Admin *</Label>
+              <Input
+                id="del-pwd"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Masukkan password login"
+              />
+            </div>
+            <div>
+              <Label htmlFor="del-reason">Alasan (opsional)</Label>
+              <Textarea
+                id="del-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Catatan alasan penghapusan"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteSubmitting}>Batal</Button>
+            <Button variant="destructive" onClick={handleDeleteSubmit} disabled={deleteSubmitting}>
+              {deleteSubmitting ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
