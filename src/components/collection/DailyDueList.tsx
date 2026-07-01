@@ -229,6 +229,76 @@ export function DailyDueList({
   const [rangeEditPassword, setRangeEditPassword] = useState<string>("");
   const [rangeEditSubmitting, setRangeEditSubmitting] = useState(false);
 
+  // Hapus kupon (delete handover batch) state
+  const [deleteTarget, setDeleteTarget] = useState<RangeEditTarget | null>(null);
+  const [deletePassword, setDeletePassword] = useState<string>("");
+  const [deleteReason, setDeleteReason] = useState<string>("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const openDeleteDialog = (target: RangeEditTarget) => {
+    setDeleteTarget(target);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTarget) return;
+    if (!deletePassword.trim()) {
+      toast.error("Password admin wajib diisi");
+      return;
+    }
+    setDeleteSubmitting(true);
+    try {
+      // Verify admin password
+      const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
+        "verify-admin-password",
+        { body: { password: deletePassword } },
+      );
+      if (verifyErr) throw verifyErr;
+      if (!verifyData?.valid) {
+        toast.error("Password admin salah");
+        setDeleteSubmitting(false);
+        return;
+      }
+
+      // Delete the handover batches for the merged range
+      const { error: delErr } = await supabase
+        .from("coupon_handovers")
+        .delete()
+        .in("id", deleteTarget.handover_ids);
+      if (delErr) throw delErr;
+
+      logActivity.mutate({
+        action: "DAILY_COLLECTION",
+        entity_type: "coupon_handover",
+        entity_id: null,
+        description:
+          `Hapus serah terima kupon ${deleteTarget.contract_ref} (${deleteTarget.customer_name}) ` +
+          `range ${deleteTarget.start_index}-${deleteTarget.end_index}` +
+          (deleteReason.trim() ? ` — Alasan: ${deleteReason.trim()}` : ""),
+        contract_id: deleteTarget.contract_id,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+
+      toast.success(
+        `Serah terima ${deleteTarget.contract_ref} range ${deleteTarget.start_index}-${deleteTarget.end_index} dihapus`,
+      );
+      closeDeleteDialog();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
+      toast.error(`Gagal menghapus kupon: ${msg}`);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
   // Dedupe paid kupon antar batch (handover bisa overlap di indeks yang sama)
   const selectedUniquePaid = useMemo(() => {
     if (!selected) return [] as { contract_id: string; index: number; daily_amount: number }[];
