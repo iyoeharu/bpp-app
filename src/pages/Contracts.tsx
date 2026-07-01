@@ -1814,7 +1814,7 @@ export default function Contracts() {
                   const progress = (selectedContract.current_installment_index / selectedContract.tenor_days) * 100;
                   const paidAmount = selectedContract.current_installment_index * selectedContract.daily_installment_amount;
                   const remainingAmount = (selectedContract.tenor_days - selectedContract.current_installment_index) * selectedContract.daily_installment_amount;
-                  const modalEfektif = Math.max(0, (selectedContract.omset || 0) - ((selectedContract as any).dp || 0));
+                  const modalEfektif = Math.max(0, (selectedContract.omset || 0));
                   const createdAt = new Date(selectedContract.created_at);
                   const today = new Date();
                   const daysElapsed = Math.max(1, Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
