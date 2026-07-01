@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TrendingUp, Wallet, Coins, Receipt, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePayments } from "@/hooks/usePayments";
-import { useMonthlyPerformance } from "@/hooks/useMonthlyPerformance";
 import { useContracts } from "@/hooks/useContracts";
 import { useCouponHandovers } from "@/hooks/useCouponHandovers";
 import { formatRupiah, formatDate } from "@/lib/format";
@@ -43,10 +42,6 @@ export function DailyProfitList() {
   const [selectedDay, setSelectedDay] = useState<DailyProfit | null>(null);
   const [detailPage, setDetailPage] = useState(1);
   const DETAIL_PAGE_SIZE = 10;
-
-  // Also fetch monthly performance summary (used by Dashboard) so we can keep
-  // the "Total Tertagih" KPI in sync with the Dashboard's value.
-  const { data: monthlyPerformanceData } = useMonthlyPerformance(currentMonth);
 
   useEffect(() => {
     setDetailPage(1);
@@ -608,7 +603,7 @@ export function DailyProfitList() {
                   Total Tertagih
                 </div>
                 <div className="text-2xl font-bold">
-                  {formatRupiah(monthlyPerformanceData?.total_collected ?? monthlySummary.totalCollected)}
+                  {formatRupiah(monthlySummary.totalCollected)}
                 </div>
               </CardContent>
             </Card>

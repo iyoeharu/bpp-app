@@ -104,8 +104,8 @@ export const useResetCouponRange = () => {
       queryClient.invalidateQueries({ queryKey: ['installment_coupons'] });
       queryClient.invalidateQueries({ queryKey: ['payment_logs'] });
       queryClient.invalidateQueries({ queryKey: ['coupon_range_adjustments'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v3'] });
-      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v3'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly_performance_contract_v5'] });
+      queryClient.invalidateQueries({ queryKey: ['yearly_financial_summary_contract_v5'] });
       queryClient.invalidateQueries({ queryKey: ['aggregated_payments'] });
       queryClient.invalidateQueries({ queryKey: ['collection_trend'] });
     },
