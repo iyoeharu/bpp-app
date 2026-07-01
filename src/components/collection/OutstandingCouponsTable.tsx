@@ -489,6 +489,7 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
                 <p className="text-sm">{formatRupiah(fTotal)}</p>
                 <p className="text-xs text-destructive">{formatRupiah(fTotal - fPaidAmt)} sisa</p>
               </TableCell>
+              <TableCell />
             </TableRow>
           </TableBody>
         </Table>
@@ -497,6 +498,63 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
       {totalPages > 1 && (
         <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={goToPage} totalItems={totalItems} />
       )}
+
+      {/* Dialog Hapus Serah Terima */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) closeDeleteDialog(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Hapus Serah Terima Kupon
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (
+                <>
+                  Menghapus serah terima <strong>{deleteTarget.contract_ref}</strong> ({deleteTarget.customer_name})
+                  {" "}range <strong>{deleteTarget.start_index}-{deleteTarget.end_index}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Aksi ini menghapus batch handover, membatalkan pembayaran pada range tersebut,
+              dan memundurkan form serah terima ke kupon {deleteTarget?.start_index}. Tidak dapat dibatalkan.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="del-pwd">Password Admin *</Label>
+              <Input
+                id="del-pwd"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Masukkan password login"
+              />
+            </div>
+            <div>
+              <Label htmlFor="del-reason">Alasan (opsional)</Label>
+              <Textarea
+                id="del-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Catatan alasan penghapusan"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteSubmitting}>Batal</Button>
+            <Button variant="destructive" onClick={handleDeleteSubmit} disabled={deleteSubmitting}>
+              {deleteSubmitting ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
