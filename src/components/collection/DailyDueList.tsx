@@ -472,12 +472,8 @@ export function DailyDueList({
     }
   };
 
-  // Total summary
-  const totalUnpaidCoupons = filteredRows.reduce((s, r) => s + r.unpaid_count, 0);
-  const totalUnpaidAmount = filteredRows.reduce(
-    (s, r) => s + r.unpaid_count * r.daily_amount,
-    0,
-  );
+  // Total summary (dedup index unik lintas batch/kontrak agar sinkron dg Range Kupon)
+  const { count: totalUnpaidCoupons, amount: totalUnpaidAmount } = computeUnique(filteredRows);
 
   return (
     <>
