@@ -830,9 +830,16 @@ export function DailyDueList({
                 </p>
 
                 <Alert>
-                  <AlertDescription>
-                    Sistem hanya menyesuaikan kupon pada serah terima yang dipilih, lalu menghitung
-                    ulang status kontrak dan saldo jika diperlukan.
+                  <AlertDescription className="space-y-1">
+                    <p>
+                      Sistem hanya menyesuaikan kupon pada serah terima yang dipilih, lalu
+                      menghitung ulang status kontrak dan saldo jika diperlukan.
+                    </p>
+                    <p className="text-xs">
+                      <strong>Auto-collapse:</strong> jika range yang Anda pilih (mis. 73-78)
+                      hanya berisi pembayaran sampai kupon 76, maka range efektif otomatis menjadi
+                      73-76. Kupon 77-78 dianggap belum terbayar dan ikut di-reset.
+                    </p>
                   </AlertDescription>
                 </Alert>
               </div>
