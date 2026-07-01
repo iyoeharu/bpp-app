@@ -404,7 +404,8 @@ export default function Contracts() {
       start_date: contract.start_date || new Date().toISOString().split("T")[0],
       status: contract.status,
   // omset yang tersimpan = total harga produk; modal = omset - dp per definisi baru
-  modal: ((contract as any).omset || 0) - ((contract as any).dp || 0),
+  // DB.omset menyimpan Modal Efektif; formData.modal (Modal Awal) = Modal Efektif + DP
+  modal: ((contract as any).omset || 0) + ((contract as any).dp || 0),
       dp: (contract as any).dp || 0,
       // Convert stored TOTAL keuntungan -> per-day for UI display
       keuntungan: (() => {
