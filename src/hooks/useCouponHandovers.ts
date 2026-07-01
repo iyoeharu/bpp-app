@@ -107,8 +107,9 @@ export const useCreateCouponHandover = () => {
         .single();
       if (cErr) throw cErr;
 
-      // Validasi DB: ambil semua installment_index lunas dari payment_logs
-      // (paginated) dan cari kupon terkecil yang BELUM lunas (gap-aware).
+      // Validasi DB: kupon awal harus mengikuti kupon berikutnya yang belum
+      // diakui pada kontrak. Jika edit range membuat current_installment_index
+      // menjadi 77, maka form serah terima berikutnya harus mulai dari 78.
       const paidAll: number[] = [];
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
@@ -125,13 +126,10 @@ export const useCreateCouponHandover = () => {
       }
       const paidSet = new Set<number>(paidAll);
       const tenor = contract.tenor_days ?? 0;
-      let expectedStartIndex = tenor + 1;
-      for (let i = 1; i <= tenor; i++) {
-        if (!paidSet.has(i)) { expectedStartIndex = i; break; }
-      }
+      const expectedStartIndex = Math.min(tenor + 1, (contract.current_installment_index ?? 0) + 1);
 
       if (data.start_index !== expectedStartIndex) {
-        throw new Error(`Kupon awal harus ${expectedStartIndex} (mengikuti data pembayaran terbaru di database)`);
+        throw new Error(`Kupon awal harus ${expectedStartIndex} (mengikuti kupon terakhir yang sudah diakui di kontrak)`);
       }
       // Pastikan tidak ada kupon dalam range yang sudah lunas di DB.
       for (let i = data.start_index; i <= data.end_index; i++) {

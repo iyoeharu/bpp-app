@@ -11,8 +11,6 @@ import { formatRupiah } from "@/lib/format";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 interface Contract {
   id: string;
@@ -56,55 +54,17 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
 
   const selectedContract = contracts?.find(c => c.id === contractId);
 
-  // Sinkron dengan database: ambil SEMUA installment_index yang sudah lunas
-  // dari payment_logs, lalu cari kupon terkecil yang BELUM lunas (gap-aware).
-  // Ini memastikan Range Kupon mengikuti kondisi nyata di database, termasuk
-  // bila ada angsuran yang di-reset di tengah (misal 54 hilang dari 1..89).
-  const { data: paidIndices } = useQuery({
-    queryKey: ['handover_form_paid_indices', contractId],
-    enabled: !!contractId,
-    queryFn: async () => {
-      const all: number[] = [];
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
-          .from('payment_logs')
-          .select('installment_index')
-          .eq('contract_id', contractId)
-          .order('installment_index', { ascending: true })
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        for (const row of data) all.push(row.installment_index as number);
-        if (data.length < PAGE) break;
-      }
-      return Array.from(new Set(all)).sort((a, b) => a - b);
-    },
-  });
-  const paidSet = new Set<number>(paidIndices ?? []);
+  // Start range mengikuti kupon terakhir yang sudah diakui pada kontrak.
+  // Jika edit range mengubah kontrak menjadi 77-77, maka form berikutnya harus mulai dari 78.
   const tenor = selectedContract?.tenor_days ?? 0;
-  // Cari kupon terkecil 1..tenor yang belum ada di payment_logs.
-  let firstUnpaid = tenor + 1;
-  for (let i = 1; i <= tenor; i++) {
-    if (!paidSet.has(i)) { firstUnpaid = i; break; }
-  }
-  const autoStartIndex = selectedContract ? firstUnpaid : 1;
+  const currentInstallmentIndex = selectedContract?.current_installment_index ?? 0;
+  const autoStartIndex = selectedContract ? currentInstallmentIndex + 1 : 1;
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
   const endIndex = autoEndIndex;
   const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
-  // Maks kupon = berapa kupon berturut-turut mulai dari firstUnpaid yang masih BELUM lunas.
-  let maxCoupons = 0;
-  if (selectedContract) {
-    for (let i = firstUnpaid; i <= tenor; i++) {
-      if (paidSet.has(i)) break;
-      maxCoupons++;
-    }
-  }
-  const overlapsPaid = selectedContract
-    ? Array.from({ length: derivedCouponCount }, (_, k) => startIndex + k).some(i => paidSet.has(i))
-    : false;
-  const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= tenor && !overlapsPaid;
+  const maxCoupons = selectedContract ? Math.max(0, tenor - currentInstallmentIndex) : 0;
+  const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= tenor;
   const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
@@ -129,14 +89,13 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
   }, [selectedContract?.id, maxCoupons, couponCount]);
 
-  // Reset jumlah kupon ke 1 setiap kali kontrak berubah ATAU
-  // current_installment_index kontrak berubah (mis. setelah Edit Range Kupon).
-  // Ini memastikan form selalu otomatis lanjut ke kupon berikutnya
-  // berdasarkan range terbaru.
+  // Reset jumlah kupon ke 1 setiap kali kontrak berubah atau
+  // current_installment_index berubah (mis. setelah Edit Range Kupon).
+  // Ini memastikan form selalu otomatis lanjut ke kupon berikutnya.
   useEffect(() => {
     if (!selectedContract) return;
     setCouponCount(1);
-  }, [selectedContract?.id, selectedContract?.current_installment_index, firstUnpaid]);
+  }, [selectedContract?.id, selectedContract?.current_installment_index]);
 
   // Reset kontrak jika tidak lagi sesuai filter kolektor
   useEffect(() => {
@@ -240,9 +199,8 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                     derivedCouponCount > 0 ? (
                       <div className="space-y-0.5">
                         <p className="text-xs text-gray-600 dark:text-gray-300">
-                          Range Kupon:{" "}
                           <span className="font-bold text-orange-700 dark:text-orange-300">
-                            {startIndex} - {endIndex}
+                            {startIndex} - {endIndex} = {derivedCouponCount} kupon
                           </span>
                         </p>
                         <p className="text-xs font-bold text-orange-600 dark:text-orange-400">
