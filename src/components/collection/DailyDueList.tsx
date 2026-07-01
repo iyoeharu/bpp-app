@@ -177,6 +177,27 @@ export function DailyDueList({
     );
   }, [rows, searchQuery]);
 
+  // Hitung sisa kupon UNIK per kontrak (dedup index yang overlap antar batch),
+  // supaya konsisten dengan Range Kupon (merged range) yang ditampilkan.
+  const computeUnique = (batches: DueRow[]) => {
+    const perContract = new Map<string, { amount: number; indices: Set<number> }>();
+    for (const b of batches) {
+      const entry = perContract.get(b.contract_id) || {
+        amount: b.daily_amount,
+        indices: new Set<number>(),
+      };
+      for (const i of b.unpaid_indices) entry.indices.add(i);
+      perContract.set(b.contract_id, entry);
+    }
+    let count = 0;
+    let amount = 0;
+    for (const { amount: a, indices } of perContract.values()) {
+      count += indices.size;
+      amount += indices.size * a;
+    }
+    return { count, amount };
+  };
+
   // Grup berdasarkan nama pelanggan — jika pelanggan sama, tumpuk batch-nya dalam 1 baris
   const groupedRows = useMemo(() => {
     const map = new Map<string, DueRow[]>();
@@ -185,12 +206,15 @@ export function DailyDueList({
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }
-    return Array.from(map.entries()).map(([customer_name, batches]) => ({
-      customer_name,
-      batches,
-      total_unpaid_count: batches.reduce((s, b) => s + b.unpaid_count, 0),
-      total_unpaid_amount: batches.reduce((s, b) => s + b.unpaid_count * b.daily_amount, 0),
-    }));
+    return Array.from(map.entries()).map(([customer_name, batches]) => {
+      const { count, amount } = computeUnique(batches);
+      return {
+        customer_name,
+        batches,
+        total_unpaid_count: count,
+        total_unpaid_amount: amount,
+      };
+    });
   }, [filteredRows]);
 
   // Dialog state — selected dapat berisi 1 atau lebih batch (digabung per pelanggan)
