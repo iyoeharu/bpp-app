@@ -596,8 +596,8 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-          // store omset as total harga produk (totalProductsForSave)
-          omset: Math.max(0, totalProductsForSave),
+          // store omset as MODAL EFEKTIF (konsisten dengan create & tampilan Modal Efektif)
+          omset: modalEfektif,
           dp: formData.dp || 0,
           _note: note,
         } as any);
