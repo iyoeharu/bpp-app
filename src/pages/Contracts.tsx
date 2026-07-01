@@ -404,7 +404,8 @@ export default function Contracts() {
       start_date: contract.start_date || new Date().toISOString().split("T")[0],
       status: contract.status,
   // omset yang tersimpan = total harga produk; modal = omset - dp per definisi baru
-  modal: ((contract as any).omset || 0) - ((contract as any).dp || 0),
+  // DB.omset menyimpan Modal Efektif; formData.modal (Modal Awal) = Modal Efektif + DP
+  modal: ((contract as any).omset || 0) + ((contract as any).dp || 0),
       dp: (contract as any).dp || 0,
       // Convert stored TOTAL keuntungan -> per-day for UI display
       keuntungan: (() => {
@@ -595,8 +596,8 @@ export default function Contracts() {
           daily_installment_amount: dailyAmount,
           start_date: formData.start_date,
           status: formData.status,
-          // store omset as total harga produk (totalProductsForSave)
-          omset: Math.max(0, totalProductsForSave),
+          // store omset as MODAL EFEKTIF (konsisten dengan create & tampilan Modal Efektif)
+          omset: modalEfektif,
           dp: formData.dp || 0,
           _note: note,
         } as any);
@@ -1813,7 +1814,7 @@ export default function Contracts() {
                   const progress = (selectedContract.current_installment_index / selectedContract.tenor_days) * 100;
                   const paidAmount = selectedContract.current_installment_index * selectedContract.daily_installment_amount;
                   const remainingAmount = (selectedContract.tenor_days - selectedContract.current_installment_index) * selectedContract.daily_installment_amount;
-                  const modalEfektif = Math.max(0, (selectedContract.omset || 0) - ((selectedContract as any).dp || 0));
+                  const modalEfektif = Math.max(0, (selectedContract.omset || 0));
                   const createdAt = new Date(selectedContract.created_at);
                   const today = new Date();
                   const daysElapsed = Math.max(1, Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
