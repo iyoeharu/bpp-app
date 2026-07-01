@@ -110,7 +110,8 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
   const maxCoupons = selectedContract ? Math.max(0, tenor - currentInstallmentIndex) : 0;
   const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= tenor;
-  const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
+  const isProgressReady = !selectedContract || (!!dbProgress && !isProgressFetching);
+  const canSubmit = !!collectorId && !!contractId && isProgressReady && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
   const filteredContracts = collectorId
@@ -159,6 +160,10 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
     if (!isRangeValid) {
       toast.error("Range kupon tidak valid");
+      return;
+    }
+    if (!isProgressReady) {
+      toast.error("Range kupon sedang divalidasi dari database");
       return;
     }
     if (derivedCouponCount > maxCoupons) {
@@ -241,7 +246,9 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                 {/* Real-time range preview tepat di bawah input jumlah kupon */}
                 <div className="rounded-md border border-orange-300/60 dark:border-orange-700/60 bg-orange-50/70 dark:bg-orange-950/30 px-3 py-2">
                   {selectedContract ? (
-                    derivedCouponCount > 0 ? (
+                    !isProgressReady ? (
+                      <p className="text-xs text-muted-foreground">Memvalidasi range kupon dari database...</p>
+                    ) : derivedCouponCount > 0 ? (
                       <div className="space-y-0.5">
                         <p className="text-xs text-gray-600 dark:text-gray-300">
                           <span className="font-bold text-orange-700 dark:text-orange-300">
