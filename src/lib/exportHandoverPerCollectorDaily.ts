@@ -201,6 +201,9 @@ export const exportHandoverPerCollectorDaily = async (handovers: EnrichedHandove
         cell.numFmt = '#,##0';
         cell.alignment = { horizontal: 'center' };
       } else if ([5].includes(colNum)) {
+        cell.numFmt = '#,##0';
+        cell.alignment = { horizontal: 'right' };
+      } else if ([6].includes(colNum)) {
         cell.numFmt = '"Rp "#,##0';
         cell.alignment = { horizontal: 'right' };
       } else if (colNum === 1) {
