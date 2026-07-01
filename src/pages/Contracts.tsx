@@ -1813,7 +1813,7 @@ export default function Contracts() {
                   const progress = (selectedContract.current_installment_index / selectedContract.tenor_days) * 100;
                   const paidAmount = selectedContract.current_installment_index * selectedContract.daily_installment_amount;
                   const remainingAmount = (selectedContract.tenor_days - selectedContract.current_installment_index) * selectedContract.daily_installment_amount;
-                  const modalAwal = Math.max(0, (selectedContract.omset || 0) - ((selectedContract as any).dp || 0));
+                  const modalEfektif = Math.max(0, (selectedContract.omset || 0) - ((selectedContract as any).dp || 0));
                   const createdAt = new Date(selectedContract.created_at);
                   const today = new Date();
                   const daysElapsed = Math.max(1, Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1868,8 +1868,8 @@ export default function Contracts() {
                           <p className="font-semibold text-lg">{formatRupiah(selectedContract.total_loan_amount)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Modal</p>
-                          <p className="font-semibold text-lg">{formatRupiah(modalAwal)}</p>
+                          <p className="text-sm text-muted-foreground">Modal Efektif</p>
+                          <p className="font-semibold text-lg">{formatRupiah(modalEfektif)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">DP (Down Payment)</p>
@@ -1877,7 +1877,7 @@ export default function Contracts() {
                         </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Keuntungan</p>
-                              <p className="font-semibold text-lg">{formatRupiah((selectedContract.total_loan_amount || 0) - modalAwal)}</p>
+                                <p className="font-semibold text-lg">{formatRupiah((selectedContract.total_loan_amount || 0) - modalEfektif)}</p>
                           </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Cicilan Harian</p>
