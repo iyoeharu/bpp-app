@@ -693,6 +693,16 @@ export function DailyDueList({
                                   <Pencil className="mr-1 h-3 w-3" />
                                   Edit
                                 </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => openDeleteDialog(m)}
+                                >
+                                  <Trash2 className="mr-1 h-3 w-3" />
+                                  Hapus
+                                </Button>
                               </div>
                             ))}
                           </div>
