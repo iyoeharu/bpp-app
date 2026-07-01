@@ -158,7 +158,6 @@ const fetchOmsetDetails = async (
     const modal = Math.max(0, Number(c.omset || 0));
     const omset = Number(c.total_loan_amount || 0);
     const profit = omset - modal;
-    const profit = omset - modal;
     total_modal += modal;
     total_dp += dp;
     total_omset += omset;
