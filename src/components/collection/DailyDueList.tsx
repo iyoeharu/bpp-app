@@ -998,6 +998,89 @@ export function DailyDueList({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Handover Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && closeDeleteDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Hapus Serah Terima Kupon
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `${deleteTarget.contract_ref} • ${deleteTarget.customer_name}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteTarget && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Range yang dihapus:</span>
+                  <span className="font-semibold font-mono">
+                    {deleteTarget.start_index}-{deleteTarget.end_index}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Kolektor:</span>
+                  <span className="font-semibold">{deleteTarget.collector_name || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Jumlah batch:</span>
+                  <span className="font-semibold">{deleteTarget.handover_ids.length}</span>
+                </div>
+              </div>
+
+              <Alert className="border-destructive/40 bg-destructive/5">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="ml-2 text-xs">
+                  Batch serah terima ini akan dihapus permanen dari daftar penagihan.
+                  Payment logs & status kupon <strong>tidak diubah</strong> — gunakan
+                  <em> Edit Range</em> jika ingin mereset pembayaran.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="delete-password" className="text-sm font-medium">
+                  Password Admin
+                </Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Masukkan password admin"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="delete-reason" className="text-sm font-medium">
+                  Alasan <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
+                </Label>
+                <Textarea
+                  id="delete-reason"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Contoh: salah input serah terima"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteSubmitting}>
+              Batal
+            </Button>
+            <Button onClick={handleDeleteSubmit} disabled={deleteSubmitting} variant="destructive">
+              {deleteSubmitting ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
