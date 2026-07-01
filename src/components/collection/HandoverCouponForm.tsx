@@ -80,30 +80,57 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
         if (data.length < pageSize) break;
       }
 
+      // Ambil juga range coupon_handovers agar "kupon yang sudah diserahkan"
+      // ikut dihitung — menghindari kasus payment_logs stale/duplikat.
+      const { data: handovers, error: hErr } = await supabase
+        .from("coupon_handovers")
+        .select("start_index,end_index")
+        .eq("contract_id", contractId);
+      if (hErr) throw hErr;
+
       const paidSet = new Set(paidIndices);
+      const reservedSet = new Set<number>(paidIndices);
+      for (const h of handovers ?? []) {
+        const s = Number(h.start_index);
+        const e = Number(h.end_index);
+        if (Number.isInteger(s) && Number.isInteger(e)) {
+          for (let i = Math.max(1, s); i <= Math.min(selectedContract.tenor_days, e); i++) {
+            reservedSet.add(i);
+          }
+        }
+      }
+
       let contiguousPaidIndex = 0;
       for (let i = 1; i <= selectedContract.tenor_days; i++) {
         if (paidSet.has(i)) contiguousPaidIndex = i;
         else break;
       }
+      // firstFreeIndex = kupon pertama yang belum ada di payment_logs
+      // dan belum tercakup coupon_handovers manapun.
+      let firstFreeIndex = selectedContract.tenor_days + 1;
+      for (let i = 1; i <= selectedContract.tenor_days; i++) {
+        if (!reservedSet.has(i)) { firstFreeIndex = i; break; }
+      }
 
       return {
         contiguousPaidIndex,
+        firstFreeIndex,
         paidCount: paidSet.size,
         maxPaidIndex: paidIndices.length ? Math.max(...paidIndices) : 0,
+        handoverCount: handovers?.length ?? 0,
       };
     },
     enabled: !!contractId && !!selectedContract,
   });
 
-  // Start range wajib mengikuti data payment_logs aktual, bukan hanya cache current_installment_index.
-  // Jika kupon 77-78 sudah dihapus dari database, gap pertama menjadi 77 walau kontrak masih menyimpan 78.
+  // Start range wajib mengikuti data aktual (payment_logs + coupon_handovers),
+  // bukan cache current_installment_index yang bisa stale.
   const tenor = selectedContract?.tenor_days ?? 0;
   const contractCurrentInstallmentIndex = selectedContract?.current_installment_index ?? 0;
-  const currentInstallmentIndex = selectedContract
-    ? (dbProgress?.contiguousPaidIndex ?? contractCurrentInstallmentIndex)
-    : 0;
-  const autoStartIndex = selectedContract ? currentInstallmentIndex + 1 : 1;
+  const autoStartIndex = selectedContract
+    ? (dbProgress?.firstFreeIndex ?? contractCurrentInstallmentIndex + 1)
+    : 1;
+  const currentInstallmentIndex = Math.max(0, autoStartIndex - 1);
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
   const endIndex = autoEndIndex;
