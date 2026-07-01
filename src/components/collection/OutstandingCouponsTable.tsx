@@ -449,6 +449,29 @@ export function OutstandingCouponsTable({ isLoading, handovers }: Props) {
                       <p className="text-xs text-destructive">{formatRupiah(total - paidAmt)} sisa</p>
                     )}
                   </TableCell>
+
+                  <TableCell className="text-center py-3">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Hapus serah terima"
+                      onClick={() => {
+                        setDeleteTarget({
+                          id: h.id,
+                          contract_id: h.contract_id,
+                          contract_ref: h.credit_contracts?.contract_ref || '-',
+                          customer_name: h.credit_contracts?.customers?.name || '-',
+                          start_index: h.start_index,
+                          end_index: h.end_index,
+                        });
+                        setDeletePassword("");
+                        setDeleteReason("");
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               );
             })}
