@@ -285,8 +285,13 @@ export default function Collection() {
             contracts={contracts}
             collectors={collectors}
             onSubmit={async (data) => {
-              await createHandover.mutateAsync(data);
-              toast.success(`Serah terima ${data.coupon_count} kupon berhasil dicatat`);
+              try {
+                await createHandover.mutateAsync(data);
+                toast.success(`Serah terima ${data.coupon_count} kupon berhasil dicatat`);
+              } catch (error) {
+                const message = error instanceof Error ? error.message : "Gagal menyimpan serah terima";
+                toast.error(message);
+              }
             }}
             isSubmitting={createHandover.isPending}
           />

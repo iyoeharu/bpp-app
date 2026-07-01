@@ -92,6 +92,7 @@ export function PaymentForm({ contracts, collectors, onSubmit, onBulkSubmit, isS
   // Calculate totals for bulk payment
   const isBulkPayment = couponCount > 1;
   const endCoupon = nextCoupon + couponCount - 1;
+  const rangeCouponLabel = `${nextCoupon} - ${endCoupon} = ${couponCount} kupon`;
   const totalBulkAmount = selectedContractData 
     ? (paymentAmount || selectedContractData.daily_installment_amount) * couponCount 
     : 0;
@@ -280,7 +281,7 @@ export function PaymentForm({ contracts, collectors, onSubmit, onBulkSubmit, isS
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-sm">{t("collection.contractDetails")}</h4>
                 <Badge variant="outline" className="text-lg font-bold px-3 py-1">
-                  {isBulkPayment ? `${nextCoupon} - ${endCoupon}` : `${nextCoupon}`}
+                  {rangeCouponLabel}
                 </Badge>
               </div>
 
@@ -402,7 +403,7 @@ export function PaymentForm({ contracts, collectors, onSubmit, onBulkSubmit, isS
                 <span className="text-lg font-bold text-primary">{formatRupiah(totalBulkAmount)}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Kupon {nextCoupon} - {endCoupon} akan dicatat sebagai PAID
+                Kupon {rangeCouponLabel} akan dicatat sebagai PAID
               </p>
             </AlertDescription>
           </Alert>

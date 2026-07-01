@@ -268,6 +268,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
               <Popover open={collectorOpen} onOpenChange={setCollectorOpen}>
                 <PopoverTrigger asChild>
                   <Button 
+                    type="button"
                     variant="outline" 
                     role="combobox" 
                     className={cn(
@@ -336,6 +337,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
               <Popover open={contractOpen} onOpenChange={setContractOpen}>
                 <PopoverTrigger asChild>
                   <Button 
+                    type="button"
                     variant="outline" 
                     role="combobox" 
                     className={cn(

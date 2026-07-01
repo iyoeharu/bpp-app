@@ -14,7 +14,8 @@
 --             - handover mencakup seluruh range (ch.start < p_start & ch.end > p_end)
 --               → di-split menjadi dua handover (kiri: ch.start..p_start-1,
 --                 kanan: p_end+1..ch.end), coupon_count menyesuaikan.
---       * current_installment_index dihitung ulang dari MAX(payment_logs.installment_index).
+--       * current_installment_index mengikuti kupon edit terakhir agar form
+--         serah terima berikutnya mulai dari kupon edit + 1.
 --       * Status kontrak: returned tetap; completed jika >= tenor; else active.
 --
 -- Contoh: user pilih 73-78, payment terakhir dalam range adalah 76.
@@ -149,9 +150,8 @@ begin
     and ch.start_index < p_start_index
     and ch.end_index between p_start_index and p_end_index;
 
-  -- 4) Hitung ulang current_installment_index dari payment_logs yang tersisa.
-  select coalesce(max(installment_index), 0) into v_after_current
-  from public.payment_logs pl where pl.contract_id = p_contract_id;
+  -- 4) Anchor serah terima berikutnya mengikuti kupon edit terakhir.
+  v_after_current := p_end_index;
 
   if v_before_status = 'returned' then v_after_status := 'returned';
   elsif v_after_current >= v_tenor then v_after_status := 'completed';
