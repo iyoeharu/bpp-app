@@ -1,14 +1,19 @@
--- reset_coupon_payment_range
+-- reset_coupon_payment_range (v3 - effective range collapses to actual payments)
 --
--- Konsep baru (sinkron dengan UI "Edit Range Kupon"):
---   - (p_start_index, p_end_index) adalah range BARU yang ingin dipertahankan.
---   - Semua kupon di range LAMA (handover yang dipilih) yang berada DI LUAR
---     range baru akan di-reset:
---       * payment_logs untuk index tsb dihapus
---       * installment_coupons.status dikembalikan ke 'unpaid'
---       * coupon_handovers di-trim (atau dihapus jika tidak lagi overlap)
---   - current_installment_index dihitung ulang dari MAX(payment_logs.installment_index)
---   - Status kontrak dihitung ulang (returned tetap, completed jika >= tenor, else active)
+-- Perilaku:
+--   - (p_start_index, p_end_index) adalah range BARU yang INGIN dipertahankan LUNAS.
+--   - Sistem membaca payment_logs untuk kontrak tsb dan menghitung range EFEKTIF:
+--        eff_start = MIN(installment_index) di payment_logs dalam [p_start..p_end]
+--        eff_end   = MAX(installment_index) di payment_logs dalam [p_start..p_end]
+--     Jika tidak ada pembayaran dalam range yang diminta, effective range = kosong
+--     (tidak ada kupon yang dipertahankan).
+--   - Contoh: user pilih 73-78, tapi payment_logs terakhir di dalam range adalah 76,
+--     maka effective range = 73-76. Kupon 77-78 dianggap TIDAK jadi terbayar dan
+--     ikut di-reset (dihapus dari payment_logs jika ada, coupon.status='unpaid').
+--   - Semua kupon di range LAMA (handover yang dipilih) DI LUAR effective range
+--     akan di-reset dan coupon_handovers ditrim/dihapus mengikuti effective range.
+--   - current_installment_index dihitung ulang dari MAX(payment_logs.installment_index).
+--   - Status kontrak dihitung ulang (returned tetap; completed jika >= tenor; else active).
 --
 -- Jalankan sekali di Supabase SQL Editor.
 
@@ -52,6 +57,9 @@ declare
   v_old_start integer;
   v_old_end integer;
   v_handover_contract_id uuid;
+  v_eff_start integer;
+  v_eff_end integer;
+  v_has_effective boolean := false;
 begin
   if p_contract_id is null then raise exception 'contract_id wajib diisi'; end if;
   if p_start_index is null or p_end_index is null then raise exception 'range kupon wajib diisi'; end if;
@@ -90,51 +98,87 @@ begin
   if not found then raise exception 'kontrak tidak ditemukan'; end if;
   if p_end_index > v_tenor then raise exception 'kupon akhir melebihi tenor (%).', v_tenor; end if;
 
-  -- 1) Hapus payment_logs pada index di dalam range lama TAPI di luar range baru
-  delete from public.payment_logs pl
+  -- Hitung EFFECTIVE range dari payment_logs yang benar-benar ada di dalam
+  -- range yang diminta user. Kupon di luar effective range dianggap tidak terbayar.
+  select min(pl.installment_index), max(pl.installment_index)
+  into v_eff_start, v_eff_end
+  from public.payment_logs pl
   where pl.contract_id = p_contract_id
-    and pl.installment_index between v_old_start and v_old_end
-    and (pl.installment_index < p_start_index or pl.installment_index > p_end_index);
+    and pl.installment_index between p_start_index and p_end_index;
+
+  v_has_effective := v_eff_start is not null and v_eff_end is not null;
+
+  -- 1) Hapus payment_logs pada index di dalam range LAMA yang berada DI LUAR effective range
+  if v_has_effective then
+    delete from public.payment_logs pl
+    where pl.contract_id = p_contract_id
+      and pl.installment_index between v_old_start and v_old_end
+      and (pl.installment_index < v_eff_start or pl.installment_index > v_eff_end);
+  else
+    -- Tidak ada pembayaran di dalam range user → reset seluruh range lama.
+    delete from public.payment_logs pl
+    where pl.contract_id = p_contract_id
+      and pl.installment_index between v_old_start and v_old_end;
+  end if;
   get diagnostics v_deleted_count = row_count;
 
-  -- 2) Trim / hapus coupon_handovers agar selaras dengan range baru
-  --    Handover yang dipilih (atau seluruh kontrak jika tidak ada pilihan)
-  --    di luar [p_start..p_end] dihapus; yang overlap di-trim ke irisan.
-  with target_handovers as (
-    select ch.*
-    from public.coupon_handovers ch
+  -- 2) Trim / hapus coupon_handovers mengikuti effective range.
+  --    Handover target (atau seluruh kontrak jika tidak ada pilihan) yang berada
+  --    di luar effective range dihapus; yang overlap di-trim ke irisan.
+  if v_has_effective then
+    with target_handovers as (
+      select ch.*
+      from public.coupon_handovers ch
+      where ch.contract_id = p_contract_id
+        and (
+          (coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids))
+          or (coalesce(array_length(v_handover_ids, 1), 0) = 0
+              and ch.start_index <= v_old_end
+              and ch.end_index   >= v_old_start)
+        )
+    ),
+    to_delete as (
+      select id from target_handovers
+      where end_index < v_eff_start or start_index > v_eff_end
+    ),
+    deleted as (
+      delete from public.coupon_handovers ch
+      using to_delete d where ch.id = d.id
+      returning ch.id
+    )
+    update public.coupon_handovers ch
+    set start_index = greatest(ch.start_index, v_eff_start),
+        end_index   = least(ch.end_index, v_eff_end),
+        coupon_count = least(ch.end_index, v_eff_end) - greatest(ch.start_index, v_eff_start) + 1
+    from target_handovers t
+    where ch.id = t.id
+      and ch.id not in (select id from deleted)
+      and (ch.start_index < v_eff_start or ch.end_index > v_eff_end);
+  else
+    -- Tidak ada effective range → hapus seluruh handover target dalam range lama.
+    delete from public.coupon_handovers ch
     where ch.contract_id = p_contract_id
       and (
-        coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids)
-        or coalesce(array_length(v_handover_ids, 1), 0) = 0
-           and ch.start_index <= v_old_end
-           and ch.end_index   >= v_old_start
-      )
-  ),
-  to_delete as (
-    select id from target_handovers
-    where end_index < p_start_index or start_index > p_end_index
-  ),
-  deleted as (
-    delete from public.coupon_handovers ch
-    using to_delete d where ch.id = d.id
-    returning ch.id
-  )
-  update public.coupon_handovers ch
-  set start_index = greatest(ch.start_index, p_start_index),
-      end_index   = least(ch.end_index, p_end_index),
-      coupon_count = least(ch.end_index, p_end_index) - greatest(ch.start_index, p_start_index) + 1
-  from target_handovers t
-  where ch.id = t.id
-    and ch.id not in (select id from deleted)
-    and (ch.start_index < p_start_index or ch.end_index > p_end_index);
+        (coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids))
+        or (coalesce(array_length(v_handover_ids, 1), 0) = 0
+            and ch.start_index <= v_old_end
+            and ch.end_index   >= v_old_start)
+      );
+  end if;
 
-  -- 3) Reset status kupon yang ter-reset menjadi 'unpaid'
-  update public.installment_coupons ic
-  set status = 'unpaid'
-  where ic.contract_id = p_contract_id
-    and ic.installment_index between v_old_start and v_old_end
-    and (ic.installment_index < p_start_index or ic.installment_index > p_end_index);
+  -- 3) Reset status kupon di luar effective range menjadi 'unpaid'
+  if v_has_effective then
+    update public.installment_coupons ic
+    set status = 'unpaid'
+    where ic.contract_id = p_contract_id
+      and ic.installment_index between v_old_start and v_old_end
+      and (ic.installment_index < v_eff_start or ic.installment_index > v_eff_end);
+  else
+    update public.installment_coupons ic
+    set status = 'unpaid'
+    where ic.contract_id = p_contract_id
+      and ic.installment_index between v_old_start and v_old_end;
+  end if;
 
   -- 4) Hitung ulang current_installment_index dari payment_logs yang tersisa
   select coalesce(max(installment_index), 0) into v_after_current
@@ -154,7 +198,10 @@ begin
     before_status, after_status, reason, requested_by
   )
   values (
-    p_contract_id, p_start_index, p_end_index, v_deleted_count,
+    p_contract_id,
+    coalesce(v_eff_start, p_start_index),
+    coalesce(v_eff_end, p_end_index),
+    v_deleted_count,
     v_before_current, v_after_current, v_before_status, v_after_status,
     nullif(trim(p_reason), ''), v_uid
   )
