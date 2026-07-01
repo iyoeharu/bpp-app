@@ -291,7 +291,7 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                           </p>
                         )}
                         <p className="text-[10px] text-muted-foreground">
-                          Edit range dipindahkan ke tab Input Pembayaran, kolom Range Kupon pada daftar penagihan hari ini.
+                          
                         </p>
                       </div>
                     ) : (
