@@ -1,21 +1,27 @@
--- reset_coupon_payment_range (v3 - effective range collapses to actual payments)
+-- reset_coupon_payment_range (v4 - user range = range to RESET)
 --
--- Perilaku:
---   - (p_start_index, p_end_index) adalah range BARU yang INGIN dipertahankan LUNAS.
---   - Sistem membaca payment_logs untuk kontrak tsb dan menghitung range EFEKTIF:
---        eff_start = MIN(installment_index) di payment_logs dalam [p_start..p_end]
---        eff_end   = MAX(installment_index) di payment_logs dalam [p_start..p_end]
---     Jika tidak ada pembayaran dalam range yang diminta, effective range = kosong
---     (tidak ada kupon yang dipertahankan).
---   - Contoh: user pilih 73-78, tapi payment_logs terakhir di dalam range adalah 76,
---     maka effective range = 73-76. Kupon 77-78 dianggap TIDAK jadi terbayar dan
---     ikut di-reset (dihapus dari payment_logs jika ada, coupon.status='unpaid').
---   - Semua kupon di range LAMA (handover yang dipilih) DI LUAR effective range
---     akan di-reset dan coupon_handovers ditrim/dihapus mengikuti effective range.
---   - current_installment_index dihitung ulang dari MAX(payment_logs.installment_index).
---   - Status kontrak dihitung ulang (returned tetap; completed jika >= tenor; else active).
+-- Semantik baru:
+--   - (p_start_index, p_end_index) adalah range yang INGIN DI-RESET (dianggap belum terbayar).
+--   - effective range = [min, max] installment_index di payment_logs kontrak tsb yang
+--     berada di dalam [p_start..p_end]. Ini hanya dipakai untuk audit/log.
+--   - Aksi:
+--       * payment_logs pada [p_start..p_end] dihapus (jika ada).
+--       * installment_coupons.status='unpaid' untuk semua index [p_start..p_end].
+--       * coupon_handovers yang overlap [p_start..p_end] di-trim:
+--             - fully inside range → dihapus
+--             - overlap kiri (ch.start < p_start, ch.end di dalam) → end := p_start-1
+--             - overlap kanan (ch.start di dalam, ch.end > p_end) → start := p_end+1
+--             - handover mencakup seluruh range (ch.start < p_start & ch.end > p_end)
+--               → di-split menjadi dua handover (kiri: ch.start..p_start-1,
+--                 kanan: p_end+1..ch.end), coupon_count menyesuaikan.
+--       * current_installment_index dihitung ulang dari MAX(payment_logs.installment_index).
+--       * Status kontrak: returned tetap; completed jika >= tenor; else active.
 --
--- Jalankan sekali di Supabase SQL Editor.
+-- Contoh: user pilih 73-78, payment terakhir dalam range adalah 76.
+--   → effective range = 73-76 (untuk audit).
+--   → payment_logs 73-76 dihapus (77-78 memang tidak ada).
+--   → installment_coupons 73-78 di-set unpaid.
+--   → coupon_handovers di-trim/split untuk mengeluarkan indeks 73-78.
 
 drop function if exists public.reset_coupon_payment_range(uuid, integer, integer, text, text);
 drop function if exists public.reset_coupon_payment_range(uuid, integer, integer, uuid[], text, text);
@@ -53,13 +59,8 @@ declare
   v_deleted_count integer := 0;
   v_admin_password text;
   v_adjustment_id uuid;
-  v_handover_ids uuid[];
-  v_old_start integer;
-  v_old_end integer;
-  v_handover_contract_id uuid;
   v_eff_start integer;
   v_eff_end integer;
-  v_has_effective boolean := false;
 begin
   if p_contract_id is null then raise exception 'contract_id wajib diisi'; end if;
   if p_start_index is null or p_end_index is null then raise exception 'range kupon wajib diisi'; end if;
@@ -75,112 +76,80 @@ begin
     raise exception 'password admin salah';
   end if;
 
-  v_handover_ids := coalesce(p_handover_ids, array[]::uuid[]);
-  if array_length(v_handover_ids, 1) > 0 then
-    select min(ch.start_index), max(ch.end_index)
-    into v_old_start, v_old_end
-    from public.coupon_handovers ch where ch.id = any(v_handover_ids);
-
-    select ch.contract_id into v_handover_contract_id
-    from public.coupon_handovers ch where ch.id = any(v_handover_ids) limit 1;
-
-    if v_handover_contract_id is null then raise exception 'handover tidak ditemukan'; end if;
-    if v_handover_contract_id <> p_contract_id then raise exception 'handover tidak sesuai kontrak'; end if;
-  else
-    select min(ch.start_index), max(ch.end_index) into v_old_start, v_old_end
-    from public.coupon_handovers ch where ch.contract_id = p_contract_id;
-  end if;
-  if v_old_start is null or v_old_end is null then raise exception 'handover belum ditemukan'; end if;
-
   select cc.tenor_days, cc.current_installment_index, cc.status
   into v_tenor, v_before_current, v_before_status
   from public.credit_contracts cc where cc.id = p_contract_id for update;
   if not found then raise exception 'kontrak tidak ditemukan'; end if;
   if p_end_index > v_tenor then raise exception 'kupon akhir melebihi tenor (%).', v_tenor; end if;
 
-  -- Hitung EFFECTIVE range dari payment_logs yang benar-benar ada di dalam
-  -- range yang diminta user. Kupon di luar effective range dianggap tidak terbayar.
+  -- Effective range (audit only): pembayaran yang benar-benar ada dalam range user.
   select min(pl.installment_index), max(pl.installment_index)
   into v_eff_start, v_eff_end
   from public.payment_logs pl
   where pl.contract_id = p_contract_id
     and pl.installment_index between p_start_index and p_end_index;
 
-  v_has_effective := v_eff_start is not null and v_eff_end is not null;
-
-  -- 1) Hapus payment_logs pada index di dalam range LAMA yang berada DI LUAR effective range
-  if v_has_effective then
-    delete from public.payment_logs pl
-    where pl.contract_id = p_contract_id
-      and pl.installment_index between v_old_start and v_old_end
-      and (pl.installment_index < v_eff_start or pl.installment_index > v_eff_end);
-  else
-    -- Tidak ada pembayaran di dalam range user → reset seluruh range lama.
-    delete from public.payment_logs pl
-    where pl.contract_id = p_contract_id
-      and pl.installment_index between v_old_start and v_old_end;
-  end if;
+  -- 1) Hapus payment_logs pada [p_start..p_end].
+  delete from public.payment_logs pl
+  where pl.contract_id = p_contract_id
+    and pl.installment_index between p_start_index and p_end_index;
   get diagnostics v_deleted_count = row_count;
 
-  -- 2) Trim / hapus coupon_handovers mengikuti effective range.
-  --    Handover target (atau seluruh kontrak jika tidak ada pilihan) yang berada
-  --    di luar effective range dihapus; yang overlap di-trim ke irisan.
-  if v_has_effective then
-    with target_handovers as (
-      select ch.*
-      from public.coupon_handovers ch
-      where ch.contract_id = p_contract_id
-        and (
-          (coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids))
-          or (coalesce(array_length(v_handover_ids, 1), 0) = 0
-              and ch.start_index <= v_old_end
-              and ch.end_index   >= v_old_start)
-        )
-    ),
-    to_delete as (
-      select id from target_handovers
-      where end_index < v_eff_start or start_index > v_eff_end
-    ),
-    deleted as (
-      delete from public.coupon_handovers ch
-      using to_delete d where ch.id = d.id
-      returning ch.id
-    )
-    update public.coupon_handovers ch
-    set start_index = greatest(ch.start_index, v_eff_start),
-        end_index   = least(ch.end_index, v_eff_end),
-        coupon_count = least(ch.end_index, v_eff_end) - greatest(ch.start_index, v_eff_start) + 1
-    from target_handovers t
-    where ch.id = t.id
-      and ch.id not in (select id from deleted)
-      and (ch.start_index < v_eff_start or ch.end_index > v_eff_end);
-  else
-    -- Tidak ada effective range → hapus seluruh handover target dalam range lama.
-    delete from public.coupon_handovers ch
-    where ch.contract_id = p_contract_id
-      and (
-        (coalesce(array_length(v_handover_ids, 1), 0) > 0 and ch.id = any(v_handover_ids))
-        or (coalesce(array_length(v_handover_ids, 1), 0) = 0
-            and ch.start_index <= v_old_end
-            and ch.end_index   >= v_old_start)
-      );
-  end if;
+  -- 2) Set installment_coupons.status='unpaid' untuk seluruh range user.
+  update public.installment_coupons ic
+  set status = 'unpaid'
+  where ic.contract_id = p_contract_id
+    and ic.installment_index between p_start_index and p_end_index;
 
-  -- 3) Reset status kupon di luar effective range menjadi 'unpaid'
-  if v_has_effective then
-    update public.installment_coupons ic
-    set status = 'unpaid'
-    where ic.contract_id = p_contract_id
-      and ic.installment_index between v_old_start and v_old_end
-      and (ic.installment_index < v_eff_start or ic.installment_index > v_eff_end);
-  else
-    update public.installment_coupons ic
-    set status = 'unpaid'
-    where ic.contract_id = p_contract_id
-      and ic.installment_index between v_old_start and v_old_end;
-  end if;
+  -- 3) Trim / split coupon_handovers yang overlap [p_start..p_end].
+  --    a) Handover yang fully inside range → hapus.
+  delete from public.coupon_handovers ch
+  where ch.contract_id = p_contract_id
+    and ch.start_index >= p_start_index
+    and ch.end_index   <= p_end_index;
 
-  -- 4) Hitung ulang current_installment_index dari payment_logs yang tersisa
+  --    b) Handover yang mencakup seluruh range (kiri < p_start dan kanan > p_end)
+  --       → split menjadi dua: buat handover kanan (p_end+1..ch.end), lalu trim kiri.
+  insert into public.coupon_handovers (
+    contract_id, collector_id, handover_date, start_index, end_index,
+    coupon_count, notes
+  )
+  select
+    ch.contract_id, ch.collector_id, ch.handover_date,
+    p_end_index + 1, ch.end_index,
+    ch.end_index - (p_end_index + 1) + 1,
+    coalesce(ch.notes, '') ||
+      case when coalesce(ch.notes,'') = '' then '' else ' | ' end ||
+      '[split dari reset ' || p_start_index || '-' || p_end_index || ']'
+  from public.coupon_handovers ch
+  where ch.contract_id = p_contract_id
+    and ch.start_index < p_start_index
+    and ch.end_index   > p_end_index;
+
+  update public.coupon_handovers ch
+  set end_index = p_start_index - 1,
+      coupon_count = (p_start_index - 1) - ch.start_index + 1
+  where ch.contract_id = p_contract_id
+    and ch.start_index < p_start_index
+    and ch.end_index   > p_end_index;
+
+  --    c) Overlap kanan (start di dalam range, end > p_end) → geser start.
+  update public.coupon_handovers ch
+  set start_index = p_end_index + 1,
+      coupon_count = ch.end_index - (p_end_index + 1) + 1
+  where ch.contract_id = p_contract_id
+    and ch.start_index between p_start_index and p_end_index
+    and ch.end_index   > p_end_index;
+
+  --    d) Overlap kiri (start < p_start, end di dalam range) → geser end.
+  update public.coupon_handovers ch
+  set end_index = p_start_index - 1,
+      coupon_count = (p_start_index - 1) - ch.start_index + 1
+  where ch.contract_id = p_contract_id
+    and ch.start_index < p_start_index
+    and ch.end_index between p_start_index and p_end_index;
+
+  -- 4) Hitung ulang current_installment_index dari payment_logs yang tersisa.
   select coalesce(max(installment_index), 0) into v_after_current
   from public.payment_logs pl where pl.contract_id = p_contract_id;
 

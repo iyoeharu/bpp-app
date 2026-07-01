@@ -824,21 +824,21 @@ export function DailyDueList({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  Yang diubah hanya range serah terima yang dipilih. Pembayaran kupon sebelum range
-                  tersebut tidak disentuh.
-                  Contoh: jika serah terima 35-38 ternyata harus 35-35, maka kupon 1-34 tetap aman.
+                  Range yang Anda pilih akan <strong>di-reset</strong> (dianggap belum terbayar).
+                  Pembayaran & serah terima di luar range tersebut tidak disentuh.
                 </p>
 
                 <Alert>
                   <AlertDescription className="space-y-1">
                     <p>
-                      Sistem hanya menyesuaikan kupon pada serah terima yang dipilih, lalu
-                      menghitung ulang status kontrak dan saldo jika diperlukan.
+                      Sistem menghapus payment_logs pada range, men-set kupon menjadi
+                      <em> unpaid</em>, dan men-trim serah terima yang overlap.
                     </p>
                     <p className="text-xs">
-                      <strong>Auto-collapse:</strong> jika range yang Anda pilih (mis. 73-78)
-                      hanya berisi pembayaran sampai kupon 76, maka range efektif otomatis menjadi
-                      73-76. Kupon 77-78 dianggap belum terbayar dan ikut di-reset.
+                      <strong>Contoh:</strong> pilih 73-78, pembayaran terakhir dalam range di 76 →
+                      effective range 73-76 (untuk audit). Payment_logs 73-78 dihapus,
+                      kupon 73-78 di-set unpaid, coupon_handovers di-trim/split untuk
+                      mengeluarkan 73-78.
                     </p>
                   </AlertDescription>
                 </Alert>
@@ -848,7 +848,7 @@ export function DailyDueList({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="range-edit-start" className="text-sm font-medium">
-                      Kupon Awal (dipertahankan)
+                      Kupon Awal (di-reset)
                     </Label>
                     <Input
                       id="range-edit-start"
@@ -860,7 +860,7 @@ export function DailyDueList({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="range-edit-end" className="text-sm font-medium">
-                      Kupon Akhir (dipertahankan)
+                      Kupon Akhir (di-reset)
                     </Label>
                     <Input
                       id="range-edit-end"
@@ -873,6 +873,7 @@ export function DailyDueList({
                     />
                   </div>
                 </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="range-edit-password" className="text-sm font-medium">
