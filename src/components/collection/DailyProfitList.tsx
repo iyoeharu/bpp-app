@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { TrendingUp, Wallet, Coins, Receipt, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePayments } from "@/hooks/usePayments";
 import { useContracts } from "@/hooks/useContracts";
-import { useCouponHandovers } from "@/hooks/useCouponHandovers";
+import { useCouponHandovers, useCouponHandoversRange } from "@/hooks/useCouponHandovers";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths } from "date-fns";
 import { id } from "date-fns/locale";
@@ -55,6 +55,10 @@ export function DailyProfitList() {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const { data: monthlyPayments, isLoading: monthlyLoading } = usePayments(
+    format(monthStart, "yyyy-MM-dd"),
+    format(monthEnd, "yyyy-MM-dd")
+  );
+  const { data: monthlyHandovers } = useCouponHandoversRange(
     format(monthStart, "yyyy-MM-dd"),
     format(monthEnd, "yyyy-MM-dd")
   );
@@ -273,12 +277,46 @@ export function DailyProfitList() {
       }
     });
 
-    map.forEach((daily) => {
+    // Apply KB-based tagihan override per (date, contract) — mirrors daily view logic
+    // so monthly Total Tagihan = accumulation of daily Total Tagihan.
+    const paidPerDayContract = new Map<string, Map<string, number>>();
+    (monthlyPayments || []).forEach((p: any) => {
+      const dateStr = p.payment_date || format(new Date(p.created_at), "yyyy-MM-dd");
+      if (!map.has(dateStr)) return;
+      const inner = paidPerDayContract.get(dateStr) || new Map<string, number>();
+      inner.set(p.contract_id, (inner.get(p.contract_id) || 0) + 1);
+      paidPerDayContract.set(dateStr, inner);
+    });
+
+    const handoverPerDayContract = new Map<string, Map<string, number>>();
+    (monthlyHandovers || []).forEach((h: any) => {
+      const dateStr = h.handover_date;
+      if (!map.has(dateStr)) return;
+      const inner = handoverPerDayContract.get(dateStr) || new Map<string, number>();
+      inner.set(h.contract_id, (inner.get(h.contract_id) || 0) + (h.coupon_count || 0));
+      handoverPerDayContract.set(dateStr, inner);
+    });
+
+    map.forEach((daily, dateStr) => {
+      // Recompute tagihan: KB (handover) overrides coupons_paid when present, else coupons_paid.
+      let tagihan = 0;
+      const paidMap = paidPerDayContract.get(dateStr) || new Map();
+      const kbMap = handoverPerDayContract.get(dateStr) || new Map();
+      const contractIds = new Set<string>([...paidMap.keys(), ...kbMap.keys()]);
+      contractIds.forEach((cid) => {
+        const info = contractMap.get(cid);
+        if (!info) return;
+        const kb = kbMap.get(cid) || 0;
+        const paid = paidMap.get(cid) || 0;
+        const units = kb > 0 ? kb : paid;
+        tagihan += units * info.daily_installment_amount;
+      });
+      daily.tagihan = tagihan;
       daily.margin = daily.collected > 0 ? (daily.profit / daily.collected) * 100 : 0;
     });
 
     return map;
-  }, [monthlyPayments, contractMap, monthStart, monthEnd]);
+  }, [monthlyPayments, monthlyHandovers, contractMap, monthStart, monthEnd]);
 
   // MONTHLY VIEW: Summary
   const monthlySummary = useMemo(() => {
