@@ -167,11 +167,11 @@ export const useSetStaffSalary = () => {
         return { action: 'updated' };
       }
 
-      if (input.amount <= 0) return { action: 'noop' };
+      if (input.amount < 0) return { action: 'noop' };
       const { error } = await supabase.from('operational_expenses').insert({
         expense_date: monthStart,
         description,
-        amount: input.amount,
+        amount: Math.max(0, input.amount),
         category: CATEGORY,
         notes,
       });
@@ -182,7 +182,6 @@ export const useSetStaffSalary = () => {
       queryClient.invalidateQueries({ queryKey: ['staff_salaries'] });
       queryClient.invalidateQueries({ queryKey: ['staff_positions_registry'] });
       queryClient.invalidateQueries({ queryKey: ['operational_expenses'] });
-      toast.success('Gaji karyawan disimpan');
     },
     onError: (err: any) => toast.error('Gagal menyimpan: ' + (err.message || err)),
   });

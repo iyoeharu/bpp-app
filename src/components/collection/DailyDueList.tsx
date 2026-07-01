@@ -276,28 +276,28 @@ export function DailyDueList({
 
     setRangeEditSubmitting(true);
     try {
-      // Reset cakupan: SEMUA handover kontrak yang overlap dengan area reset
-      // (bukan hanya batch yang dipilih) — handoverIds sengaja tidak dikirim.
+      // Reset cakupan: hanya handover yang dipilih pada dialog ini.
       const result = await resetCouponRange.mutateAsync({
         contractId: rangeEditTarget.contract_id,
         startIndex: rangeEditStart,
         endIndex: rangeEditEnd,
+        handoverIds: rangeEditTarget.handover_ids,
         reason: rangeEditReason.trim() || undefined,
         adminPassword: rangeEditPassword,
       });
 
       toast.success(
-        `Range ${rangeEditTarget.contract_ref} diperbarui menjadi ${rangeEditStart}-${rangeEditEnd}. ` +
-          `${result?.deleted_payment_count ?? 0} pembayaran di luar range dihapus, serah terima lama direset, ` +
-          `form serah terima otomatis lanjut ke kupon berikutnya.`,
+        `Range serah terima ${rangeEditTarget.contract_ref} diperbarui menjadi ${rangeEditStart}-${rangeEditEnd}. ` +
+          `${result?.deleted_payment_count ?? 0} pembayaran pada kupon yang dipilih di luar range baru dihapus, ` +
+          `pembayaran sebelum range terpilih tetap aman.`,
       );
       logActivity.mutate({
         action: "DAILY_COLLECTION",
         entity_type: "payment",
         entity_id: null,
         description:
-          `Edit range kupon ${rangeEditTarget.contract_ref} (${rangeEditTarget.customer_name}) ` +
-          `dari ${rangeEditStart}-${rangeEditEnd}` +
+          `Edit range serah terima kupon ${rangeEditTarget.contract_ref} (${rangeEditTarget.customer_name}) ` +
+          `menjadi ${rangeEditStart}-${rangeEditEnd}` +
           (rangeEditReason.trim() ? ` — Alasan: ${rangeEditReason.trim()}` : ""),
         contract_id: rangeEditTarget.contract_id,
       });
@@ -786,7 +786,7 @@ export function DailyDueList({
             <DialogDescription>
               {rangeEditTarget
                 ? `${rangeEditTarget.contract_ref} • ${rangeEditTarget.customer_name}`
-                : "Pilih range untuk diubah"}
+                : "Pilih range serah terima untuk diubah"}
             </DialogDescription>
           </DialogHeader>
 
@@ -807,15 +807,15 @@ export function DailyDueList({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  Kupon di luar range baru ini akan dihapus dari serah terima &amp; pembayaran.
-                  Contoh: range lama 1-38 diubah menjadi 1-35 → kupon 36-38 di-reset,
-                  form serah terima otomatis lanjut ke kupon 36.
+                  Yang diubah hanya range serah terima yang dipilih. Pembayaran kupon sebelum range
+                  tersebut tidak disentuh.
+                  Contoh: jika serah terima 35-38 ternyata harus 35-35, maka kupon 1-34 tetap aman.
                 </p>
 
                 <Alert>
                   <AlertDescription>
-                    Sistem akan menghapus pembayaran pada range ini, mengembalikan status kupon,
-                    lalu menghitung ulang status kontrak dan saldo.
+                    Sistem hanya menyesuaikan kupon pada serah terima yang dipilih, lalu menghitung
+                    ulang status kontrak dan saldo jika diperlukan.
                   </AlertDescription>
                 </Alert>
               </div>

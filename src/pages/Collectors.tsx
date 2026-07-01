@@ -195,7 +195,7 @@ export default function Collectors() {
       toast.error(`Posisi "${pos}" sudah ada bulan ini`);
       return;
     }
-    await setStaffSalary.mutateAsync({
+    const result = await setStaffSalary.mutateAsync({
       id: staffEditTarget?.id,
       position: pos,
       name: nm,
@@ -203,6 +203,16 @@ export default function Collectors() {
       amount: staffAmount || 0,
       month: selectedMonth,
     });
+
+    if (!staffEditTarget && (staffAmount || 0) <= 0) {
+      toast.success(`Posisi ${pos} disimpan tanpa nominal gaji bulan ini`);
+    } else if (result.action === 'deleted') {
+      toast.success(`Gaji posisi ${pos} dihapus`);
+    } else if (result.action === 'updated') {
+      toast.success(`Gaji posisi ${pos} berhasil diperbarui`);
+    } else if (result.action === 'created') {
+      toast.success(`Gaji posisi ${pos} berhasil disimpan`);
+    }
     setStaffDialogOpen(false);
   };
   const handleDeleteStaff = async (row: StaffSalaryRow) => {
