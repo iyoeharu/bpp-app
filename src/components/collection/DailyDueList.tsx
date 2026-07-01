@@ -245,17 +245,24 @@ export function DailyDueList({
     }
     setDeleteSubmitting(true);
     try {
-      // Verify admin password
-      const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
-        "verify-admin-password",
-        { body: { password: deletePassword } },
-      );
-      if (verifyErr) throw verifyErr;
-      if (!verifyData?.valid) {
-        toast.error("Password admin salah");
+      // Verify via user auth (re-sign in with current email + password)
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData.user?.email;
+      if (!email) {
+        toast.error("Sesi tidak valid, silakan login ulang");
         setDeleteSubmitting(false);
         return;
       }
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: deletePassword,
+      });
+      if (verifyErr) {
+        toast.error("Password salah");
+        setDeleteSubmitting(false);
+        return;
+      }
+
 
       // Delete the handover batches for the merged range
       const { error: delErr } = await supabase
