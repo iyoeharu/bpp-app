@@ -150,8 +150,10 @@ begin
     and ch.start_index < p_start_index
     and ch.end_index between p_start_index and p_end_index;
 
-  -- 4) Anchor serah terima berikutnya mengikuti kupon edit terakhir.
-  v_after_current := p_end_index;
+  -- 4) Anchor serah terima berikutnya mundur ke sebelum range yang di-reset,
+  --    sehingga form serah terima berikutnya dimulai dari p_start_index.
+  --    Contoh: reset 77-78 → current_installment_index = 76, form mulai 77.
+  v_after_current := greatest(p_start_index - 1, 0);
 
   if v_before_status = 'returned' then v_after_status := 'returned';
   elsif v_after_current >= v_tenor then v_after_status := 'completed';
