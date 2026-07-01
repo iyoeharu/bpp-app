@@ -95,7 +95,18 @@ export const exportPaymentPerCollectorDaily = async (
     // Merge handovers per collector+contract so multiple handovers for the
     // same contract are combined into a single detail row in the Excel.
     // We'll build a temporary map: collectorId -> (contractId -> merged detail)
-    const tempCollectorMap = new Map<string, { collectorId: string; collectorName: string; collectorCode: string; detailsMap: Map<string, PaymentDetail> }>();
+    const tempCollectorMap = new Map<string, { collectorId: string; collectorName: string; collectorCode: string; detailsMap: Map<string, {
+      contractId: string;
+      customerName: string;
+      contractRef: string;
+      startIndex: number;
+      endIndex: number;
+      dailyAmount: number;
+      paidIndices: Set<number>;
+      unpaidIndices: Set<number>;
+      status: PaymentDetail['status'];
+      statusLabel: string;
+    }> }>();
 
     const ensureTempCollector = (id: string, name: string, code: string) => {
       if (!tempCollectorMap.has(id)) {
@@ -119,7 +130,16 @@ export const exportPaymentPerCollectorDaily = async (
         const paidEndIndex = Math.min(currentIndex, h.end_index);
         const paidStartIndex = h.start_index;
         const paidCount = Math.max(0, paidEndIndex - paidStartIndex + 1);
-        const totalAmount = paidCount * dailyAmount;
+
+        const unpaidIndices = new Set<number>();
+        for (let i = Math.max(h.start_index, currentIndex + 1); i <= h.end_index; i++) {
+          unpaidIndices.add(i);
+        }
+
+        const paidIndices = new Set<number>();
+        for (let i = h.start_index; i <= paidEndIndex; i++) {
+          paidIndices.add(i);
+        }
 
         const mergedContract = {
           ...contract,
@@ -156,12 +176,9 @@ export const exportPaymentPerCollectorDaily = async (
             contractRef,
             startIndex: h.start_index,
             endIndex: h.end_index,
-            paidStartIndex,
-            paidEndIndex,
-            couponCount: h.coupon_count,
-            paidCount,
             dailyAmount,
-            totalAmount,
+            paidIndices,
+            unpaidIndices,
             status,
             statusLabel: label,
           });
@@ -170,11 +187,8 @@ export const exportPaymentPerCollectorDaily = async (
           const ex = dm.get(key)!;
           ex.startIndex = Math.min(ex.startIndex, h.start_index);
           ex.endIndex = Math.max(ex.endIndex, h.end_index);
-          ex.paidStartIndex = ex.paidStartIndex ? Math.min(ex.paidStartIndex, paidStartIndex) : paidStartIndex;
-          ex.paidEndIndex = Math.max(ex.paidEndIndex, paidEndIndex);
-          ex.couponCount = (ex.couponCount || 0) + (h.coupon_count || 0);
-          ex.paidCount = (ex.paidCount || 0) + paidCount;
-          ex.totalAmount = (ex.totalAmount || 0) + totalAmount;
+          unpaidIndices.forEach((idx) => ex.unpaidIndices.add(idx));
+          paidIndices.forEach((idx) => ex.paidIndices.add(idx));
           // keep dailyAmount as-is (assume consistent per contract)
           // recompute status label by using mergedContract (latest info)
           if (contractStatusMap?.has(h.contract_id)) {
@@ -198,7 +212,25 @@ export const exportPaymentPerCollectorDaily = async (
     // Convert tempCollectorMap into collectorMap groups
     tempCollectorMap.forEach((val) => {
       const group = ensureCollector(val.collectorId, val.collectorName, val.collectorCode);
-      val.detailsMap.forEach((pd) => group.details.push(pd));
+      val.detailsMap.forEach((pd) => {
+        const paidCount = pd.paidIndices.size;
+        const kuponSisa = pd.unpaidIndices.size;
+        group.details.push({
+          contractId: pd.contractId,
+          customerName: pd.customerName,
+          contractRef: pd.contractRef,
+          startIndex: pd.startIndex,
+          endIndex: pd.endIndex,
+          paidStartIndex: paidCount > 0 ? Math.min(...pd.paidIndices) : pd.startIndex,
+          paidEndIndex: paidCount > 0 ? Math.max(...pd.paidIndices) : pd.endIndex,
+          couponCount: paidCount + kuponSisa,
+          paidCount,
+          dailyAmount: pd.dailyAmount,
+          totalAmount: paidCount * pd.dailyAmount,
+          status: pd.status,
+          statusLabel: pd.statusLabel,
+        });
+      });
     });
   } else {
     // Fallback: build from payments
@@ -355,14 +387,11 @@ export const exportPaymentPerCollectorDaily = async (
     const startRow = hRow.number + 1;
 
     c.details.forEach((d, idx) => {
-      // No Kupon: show the range of handover indexes THAT ARE ALREADY PAID (paidStartIndex-paidEndIndex).
-      // If nothing has been paid yet, show '0'. This aligns the export with the user's request.
-      const hasPaid = (d.paidCount || 0) > 0 && typeof d.paidStartIndex === 'number' && typeof d.paidEndIndex === 'number';
-      const range = !hasPaid
-        ? '0'
-        : d.paidStartIndex === d.paidEndIndex
-          ? `${d.paidStartIndex}`
-          : `${d.paidStartIndex}-${d.paidEndIndex}`;
+      // No Kupon harus sama dengan Range Kupon pada tabel penagihan harian:
+      // selalu tampilkan range handover asli.
+      const range = d.startIndex === d.endIndex
+        ? `${d.startIndex}`
+        : `${d.startIndex}-${d.endIndex}`;
       // kupon sisa (belum dibayar) = total kupon handover - paidCount
       const kuponSisa = Math.max(0, (d.couponCount || 0) - (d.paidCount || 0));
       const row = sheet.addRow([
