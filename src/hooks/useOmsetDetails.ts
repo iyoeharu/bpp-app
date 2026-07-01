@@ -153,10 +153,11 @@ const fetchOmsetDetails = async (
   let total_omset = 0;
 
   (contracts || []).forEach((c: any) => {
-    const totalProducts = Number(c.omset || 0);
+    // DB.omset = Modal Efektif (acuan tampilan "Modal efektif" di form kontrak)
     const dp = Number(c.dp || 0);
-    const modal = Math.max(0, totalProducts - dp);
+    const modal = Math.max(0, Number(c.omset || 0));
     const omset = Number(c.total_loan_amount || 0);
+    const profit = omset - modal;
     const profit = omset - modal;
     total_modal += modal;
     total_dp += dp;
