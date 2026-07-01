@@ -58,6 +58,10 @@ export function DailyProfitList() {
     format(monthStart, "yyyy-MM-dd"),
     format(monthEnd, "yyyy-MM-dd")
   );
+  const { data: monthlyHandovers } = useCouponHandoversRange(
+    format(monthStart, "yyyy-MM-dd"),
+    format(monthEnd, "yyyy-MM-dd")
+  );
 
   const { data: contracts, isLoading: contractsLoading } = useContracts();
 
