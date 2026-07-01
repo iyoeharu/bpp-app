@@ -285,6 +285,11 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                         <p className="text-xs font-bold text-orange-600 dark:text-orange-400">
                           Total: {formatRupiah(derivedCouponCount * selectedContract.daily_installment_amount)}
                         </p>
+                        {dbProgress && (
+                          <p className="text-[10px] text-muted-foreground">
+                            DB: kupon lunas terakhir {dbProgress.maxPaidIndex || 0}, kontigu 1–{dbProgress.contiguousPaidIndex}, {dbProgress.handoverCount} handover. Kupon awal berikutnya: {dbProgress.firstFreeIndex}.
+                          </p>
+                        )}
                         <p className="text-[10px] text-muted-foreground">
                           Edit range dipindahkan ke tab Input Pembayaran, kolom Range Kupon pada daftar penagihan hari ini.
                         </p>
