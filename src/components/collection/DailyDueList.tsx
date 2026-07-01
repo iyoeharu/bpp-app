@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckCircle2, AlertTriangle, Pencil } from "lucide-react";
+import { CalendarClock, CheckCircle2, AlertTriangle, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -228,6 +228,76 @@ export function DailyDueList({
   const [rangeEditReason, setRangeEditReason] = useState<string>("");
   const [rangeEditPassword, setRangeEditPassword] = useState<string>("");
   const [rangeEditSubmitting, setRangeEditSubmitting] = useState(false);
+
+  // Hapus kupon (delete handover batch) state
+  const [deleteTarget, setDeleteTarget] = useState<RangeEditTarget | null>(null);
+  const [deletePassword, setDeletePassword] = useState<string>("");
+  const [deleteReason, setDeleteReason] = useState<string>("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const openDeleteDialog = (target: RangeEditTarget) => {
+    setDeleteTarget(target);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeleteReason("");
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTarget) return;
+    if (!deletePassword.trim()) {
+      toast.error("Password admin wajib diisi");
+      return;
+    }
+    setDeleteSubmitting(true);
+    try {
+      // Verify admin password
+      const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
+        "verify-admin-password",
+        { body: { password: deletePassword } },
+      );
+      if (verifyErr) throw verifyErr;
+      if (!verifyData?.valid) {
+        toast.error("Password admin salah");
+        setDeleteSubmitting(false);
+        return;
+      }
+
+      // Delete the handover batches for the merged range
+      const { error: delErr } = await supabase
+        .from("coupon_handovers")
+        .delete()
+        .in("id", deleteTarget.handover_ids);
+      if (delErr) throw delErr;
+
+      logActivity.mutate({
+        action: "DAILY_COLLECTION",
+        entity_type: "coupon_handover",
+        entity_id: null,
+        description:
+          `Hapus serah terima kupon ${deleteTarget.contract_ref} (${deleteTarget.customer_name}) ` +
+          `range ${deleteTarget.start_index}-${deleteTarget.end_index}` +
+          (deleteReason.trim() ? ` — Alasan: ${deleteReason.trim()}` : ""),
+        contract_id: deleteTarget.contract_id,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+
+      toast.success(
+        `Serah terima ${deleteTarget.contract_ref} range ${deleteTarget.start_index}-${deleteTarget.end_index} dihapus`,
+      );
+      closeDeleteDialog();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Terjadi kesalahan";
+      toast.error(`Gagal menghapus kupon: ${msg}`);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
 
   // Dedupe paid kupon antar batch (handover bisa overlap di indeks yang sama)
   const selectedUniquePaid = useMemo(() => {
@@ -623,6 +693,16 @@ export function DailyDueList({
                                   <Pencil className="mr-1 h-3 w-3" />
                                   Edit
                                 </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => openDeleteDialog(m)}
+                                >
+                                  <Trash2 className="mr-1 h-3 w-3" />
+                                  Hapus
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -914,6 +994,89 @@ export function DailyDueList({
             </Button>
             <Button onClick={handleRangeEditSubmit} disabled={rangeEditSubmitting} variant="destructive">
               {rangeEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Handover Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && closeDeleteDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Hapus Serah Terima Kupon
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `${deleteTarget.contract_ref} • ${deleteTarget.customer_name}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteTarget && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Range yang dihapus:</span>
+                  <span className="font-semibold font-mono">
+                    {deleteTarget.start_index}-{deleteTarget.end_index}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Kolektor:</span>
+                  <span className="font-semibold">{deleteTarget.collector_name || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Jumlah batch:</span>
+                  <span className="font-semibold">{deleteTarget.handover_ids.length}</span>
+                </div>
+              </div>
+
+              <Alert className="border-destructive/40 bg-destructive/5">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="ml-2 text-xs">
+                  Batch serah terima ini akan dihapus permanen dari daftar penagihan.
+                  Payment logs & status kupon <strong>tidak diubah</strong> — gunakan
+                  <em> Edit Range</em> jika ingin mereset pembayaran.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="delete-password" className="text-sm font-medium">
+                  Password Admin
+                </Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Masukkan password admin"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="delete-reason" className="text-sm font-medium">
+                  Alasan <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
+                </Label>
+                <Textarea
+                  id="delete-reason"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Contoh: salah input serah terima"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteSubmitting}>
+              Batal
+            </Button>
+            <Button onClick={handleDeleteSubmit} disabled={deleteSubmitting} variant="destructive">
+              {deleteSubmitting ? "Menghapus..." : "Hapus"}
             </Button>
           </DialogFooter>
         </DialogContent>
