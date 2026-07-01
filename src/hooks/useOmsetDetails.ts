@@ -74,30 +74,57 @@ const fetchOmsetDetails = async (
   const startISO = `${start}T00:00:00.000Z`;
   const endISO = `${end}T23:59:59.999Z`;
 
-  const [
-    { data: contracts, error: cErr },
-    { data: agents, error: aErr },
-    { data: returnedThisPeriod, error: rErr },
-  ] = await Promise.all([
-    // Kontrak yang start_date-nya di periode — Omset_Awal (immutable)
-    // SERTAKAN yang sudah di-return: nilai awal tetap tercatat di bulan dibuatnya.
-    supabase
+  // Fetch contracts with returned_at; fallback to no returned_at if column missing
+  let contracts: any[] | null = null;
+  {
+    const res = await supabase
       .from('credit_contracts')
       .select('id, contract_ref, start_date, sales_agent_id, omset, dp, total_loan_amount, status, returned_at, customers(name, phone)' as any)
       .gte('start_date', start)
-      .lte('start_date', end),
-    supabase.from('sales_agents').select('id, name, agent_code'),
-    // Kontrak yang DI-RETURN di periode ini (penyesuaian negatif untuk bulan retur diajukan)
-    supabase
+      .lte('start_date', end);
+    if (res.error) {
+      const msg = String(res.error.message || '');
+      if (/returned_at/i.test(msg)) {
+        console.warn('[useOmsetDetails] returned_at fallback:', msg);
+        const res2 = await supabase
+          .from('credit_contracts')
+          .select('id, contract_ref, start_date, sales_agent_id, omset, dp, total_loan_amount, status, customers(name, phone)' as any)
+          .gte('start_date', start)
+          .lte('start_date', end);
+        if (res2.error) throw res2.error;
+        contracts = res2.data || [];
+      } else {
+        throw res.error;
+      }
+    } else {
+      contracts = res.data || [];
+    }
+  }
+
+  const { data: agents, error: aErr } = await supabase.from('sales_agents').select('id, name, agent_code');
+  if (aErr) throw aErr;
+
+  // Returned-in-period; skip entirely if column missing
+  let returnedThisPeriod: any[] = [];
+  {
+    const res = await supabase
       .from('credit_contracts')
       .select('id, contract_ref, start_date, sales_agent_id, omset, dp, total_loan_amount, returned_at, customers(name)' as any)
       .eq('status', 'returned')
       .gte('returned_at', startISO)
-      .lte('returned_at', endISO),
-  ]);
-  if (cErr) throw cErr;
-  if (aErr) throw aErr;
-  if (rErr) throw rErr;
+      .lte('returned_at', endISO);
+    if (res.error) {
+      const msg = String(res.error.message || '');
+      if (/returned_at/i.test(msg)) {
+        console.warn('[useOmsetDetails] skip return adjustments (returned_at missing)');
+        returnedThisPeriod = [];
+      } else {
+        throw res.error;
+      }
+    } else {
+      returnedThisPeriod = res.data || [];
+    }
+  }
 
   const contractIds = [
     ...(contracts || []).map((c: any) => c.id),
