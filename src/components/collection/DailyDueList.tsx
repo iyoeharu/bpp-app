@@ -538,10 +538,7 @@ export function DailyDueList({
                 </TableHeader>
                 <TableBody>
                   {groupedRows.map((group) => {
-                    const totalAmount = group.batches.reduce(
-                      (s, b) => s + b.daily_amount * b.unpaid_count,
-                      0,
-                    );
+                    const totalAmount = group.total_unpaid_amount;
                     const uniq = (arr: string[]) =>
                       Array.from(new Set(arr.filter(Boolean)));
                     const contractRefs = uniq(group.batches.map((b) => b.contract_ref));
