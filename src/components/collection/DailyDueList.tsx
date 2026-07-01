@@ -264,12 +264,42 @@ export function DailyDueList({
       }
 
 
-      // Delete the handover batches for the merged range
+      const startIdx = deleteTarget.start_index;
+      const endIdx = deleteTarget.end_index;
+      const contractId = deleteTarget.contract_id;
+
+      // 1) Delete handover batches
       const { error: delErr } = await supabase
         .from("coupon_handovers")
         .delete()
         .in("id", deleteTarget.handover_ids);
       if (delErr) throw delErr;
+
+      // 2) Delete payment_logs in the deleted range so tagihan / progress rewinds
+      const { error: delPayErr } = await supabase
+        .from("payment_logs")
+        .delete()
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (delPayErr) throw delPayErr;
+
+      // 3) Reset installment_coupons status to unpaid within the range
+      const { error: updCouponErr } = await supabase
+        .from("installment_coupons")
+        .update({ status: "unpaid" })
+        .eq("contract_id", contractId)
+        .gte("installment_index", startIdx)
+        .lte("installment_index", endIdx);
+      if (updCouponErr) throw updCouponErr;
+
+      // 4) Rewind current_installment_index so the handover form resumes at startIdx
+      const newCurrent = Math.max(0, startIdx - 1);
+      const { error: updContractErr } = await supabase
+        .from("credit_contracts")
+        .update({ current_installment_index: newCurrent, status: "active" })
+        .eq("id", contractId);
+      if (updContractErr) throw updContractErr;
 
       logActivity.mutate({
         action: "DAILY_COLLECTION",
@@ -277,16 +307,22 @@ export function DailyDueList({
         entity_id: null,
         description:
           `Hapus serah terima kupon ${deleteTarget.contract_ref} (${deleteTarget.customer_name}) ` +
-          `range ${deleteTarget.start_index}-${deleteTarget.end_index}` +
+          `range ${startIdx}-${endIdx} — form serah terima kembali ke ${startIdx}` +
           (deleteReason.trim() ? ` — Alasan: ${deleteReason.trim()}` : ""),
-        contract_id: deleteTarget.contract_id,
+        contract_id: contractId,
       });
 
       queryClient.invalidateQueries({ queryKey: ["coupon_handovers"] });
       queryClient.invalidateQueries({ queryKey: ["outstanding_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["credit_contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["installment_coupons"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_logs"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["monthly_performance_contract_v5"] });
+      queryClient.invalidateQueries({ queryKey: ["yearly_financial_summary_contract_v5"] });
 
       toast.success(
-        `Serah terima ${deleteTarget.contract_ref} range ${deleteTarget.start_index}-${deleteTarget.end_index} dihapus`,
+        `Serah terima ${deleteTarget.contract_ref} range ${startIdx}-${endIdx} dihapus, form kembali ke kupon ${startIdx}`,
       );
       closeDeleteDialog();
     } catch (e: unknown) {
