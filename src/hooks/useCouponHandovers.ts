@@ -126,7 +126,11 @@ export const useCreateCouponHandover = () => {
       }
       const paidSet = new Set<number>(paidAll);
       const tenor = contract.tenor_days ?? 0;
-      const expectedStartIndex = Math.min(tenor + 1, (contract.current_installment_index ?? 0) + 1);
+      let contiguousPaidIndex = 0;
+      for (let i = 1; i <= tenor; i++) {
+        if (paidSet.has(i)) contiguousPaidIndex = i; else break;
+      }
+      const expectedStartIndex = Math.min(tenor + 1, contiguousPaidIndex + 1);
 
       if (data.start_index !== expectedStartIndex) {
         throw new Error(`Kupon awal harus ${expectedStartIndex} (mengikuti kupon terakhir yang sudah diakui di kontrak)`);

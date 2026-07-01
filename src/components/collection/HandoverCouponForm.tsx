@@ -11,6 +11,8 @@ import { formatRupiah } from "@/lib/format";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Contract {
   id: string;
@@ -54,10 +56,53 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
 
   const selectedContract = contracts?.find(c => c.id === contractId);
 
-  // Start range mengikuti kupon terakhir yang sudah diakui pada kontrak.
-  // Jika edit range mengubah kontrak menjadi 77-77, maka form berikutnya harus mulai dari 78.
+  const { data: dbProgress, isFetching: isProgressFetching } = useQuery({
+    queryKey: ["payment_logs", "contract-progress", contractId],
+    queryFn: async () => {
+      if (!contractId || !selectedContract) return null;
+      const paidIndices: number[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("payment_logs")
+          .select("installment_index")
+          .eq("contract_id", contractId)
+          .order("installment_index", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) {
+          const index = Number(row.installment_index);
+          if (Number.isInteger(index) && index >= 1 && index <= selectedContract.tenor_days) {
+            paidIndices.push(index);
+          }
+        }
+        if (data.length < pageSize) break;
+      }
+
+      const paidSet = new Set(paidIndices);
+      let contiguousPaidIndex = 0;
+      for (let i = 1; i <= selectedContract.tenor_days; i++) {
+        if (paidSet.has(i)) contiguousPaidIndex = i;
+        else break;
+      }
+
+      return {
+        contiguousPaidIndex,
+        paidCount: paidSet.size,
+        maxPaidIndex: paidIndices.length ? Math.max(...paidIndices) : 0,
+      };
+    },
+    enabled: !!contractId && !!selectedContract,
+  });
+
+  // Start range wajib mengikuti data payment_logs aktual, bukan hanya cache current_installment_index.
+  // Jika kupon 77-78 sudah dihapus dari database, gap pertama menjadi 77 walau kontrak masih menyimpan 78.
   const tenor = selectedContract?.tenor_days ?? 0;
-  const currentInstallmentIndex = selectedContract?.current_installment_index ?? 0;
+  const contractCurrentInstallmentIndex = selectedContract?.current_installment_index ?? 0;
+  const currentInstallmentIndex = selectedContract
+    ? (dbProgress?.contiguousPaidIndex ?? contractCurrentInstallmentIndex)
+    : 0;
   const autoStartIndex = selectedContract ? currentInstallmentIndex + 1 : 1;
   const autoEndIndex = autoStartIndex + couponCount - 1;
   const startIndex = autoStartIndex;
@@ -65,7 +110,8 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
   const derivedCouponCount = Math.max(0, endIndex - startIndex + 1);
   const maxCoupons = selectedContract ? Math.max(0, tenor - currentInstallmentIndex) : 0;
   const isRangeValid = !!selectedContract && startIndex >= 1 && endIndex >= startIndex && endIndex <= tenor;
-  const canSubmit = !!collectorId && !!contractId && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
+  const isProgressReady = !selectedContract || (!!dbProgress && !isProgressFetching);
+  const canSubmit = !!collectorId && !!contractId && isProgressReady && derivedCouponCount >= 1 && derivedCouponCount <= maxCoupons && isRangeValid && !isSubmitting;
 
   // Filter kontrak berdasarkan kolektor yang dipilih (jika ada)
   const filteredContracts = collectorId
@@ -114,6 +160,10 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
     }
     if (!isRangeValid) {
       toast.error("Range kupon tidak valid");
+      return;
+    }
+    if (!isProgressReady) {
+      toast.error("Range kupon sedang divalidasi dari database");
       return;
     }
     if (derivedCouponCount > maxCoupons) {
@@ -196,7 +246,9 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                 {/* Real-time range preview tepat di bawah input jumlah kupon */}
                 <div className="rounded-md border border-orange-300/60 dark:border-orange-700/60 bg-orange-50/70 dark:bg-orange-950/30 px-3 py-2">
                   {selectedContract ? (
-                    derivedCouponCount > 0 ? (
+                    !isProgressReady ? (
+                      <p className="text-xs text-muted-foreground">Memvalidasi range kupon dari database...</p>
+                    ) : derivedCouponCount > 0 ? (
                       <div className="space-y-0.5">
                         <p className="text-xs text-gray-600 dark:text-gray-300">
                           <span className="font-bold text-orange-700 dark:text-orange-300">
@@ -427,8 +479,15 @@ export function HandoverCouponForm({ contracts, collectors, onSubmit, isSubmitti
                   <Hash className="h-8 w-8 text-blue-500 bg-blue-100 dark:bg-blue-900/50 rounded-full p-1.5" />
                   <div>
                     <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">Kupon Saat Ini</p>
-                    <p className="font-bold text-blue-800 dark:text-blue-200">{selectedContract.current_installment_index}</p>
+                    <p className="font-bold text-blue-800 dark:text-blue-200">
+                      {isProgressFetching ? "..." : currentInstallmentIndex}
+                    </p>
                     <p className="text-xs text-blue-600 dark:text-blue-400">dari {selectedContract.tenor_days}</p>
+                    {dbProgress && dbProgress.contiguousPaidIndex !== contractCurrentInstallmentIndex && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-300">
+                        Disesuaikan dari database
+                      </p>
+                    )}
                   </div>
                 </div>
                 
